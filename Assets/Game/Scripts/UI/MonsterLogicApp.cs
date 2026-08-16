@@ -75,7 +75,8 @@ namespace MonsterLogic.UI
             var emblem = Raw(_screen.transform, "Emblem", _appIcon); Anchor(emblem.rectTransform, .5f, .79f, 230, 230);
             var title = Text(_screen.transform, "Title", "MONSTER\nLOGIC", 78, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(title.rectTransform, .5f, .65f, 760, 210);
             var tag = Text(_screen.transform, "Tag", "ONE MONSTER. EVERY LINE. NO TOUCHING.", 23, _theme.muted, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(tag.rectTransform, .5f, .54f, 780, 65);
-            var play = Button(_screen.transform, "Play", _save.Data.highestUnlocked <= 1 ? "PLAY" : $"CONTINUE  ·  LEVEL {_save.Data.highestUnlocked}", () => StartLevel(_save.Data.highestUnlocked)); Anchor(play, .5f, .40f, 650, 118);
+            bool canContinue = _save.Data.highestUnlocked > 1 && _save.Data.currentLevelId == $"campaign-{_save.Data.highestUnlocked:000}";
+            var play = Button(_screen.transform, "Play", canContinue ? $"CONTINUE  ·  LEVEL {_save.Data.highestUnlocked}" : "PLAY", () => StartLevel(_save.Data.highestUnlocked)); Anchor(play, .5f, .40f, 650, 118);
             var levels = Button(_screen.transform, "Levels", "CHAPTERS  ·  250 PUZZLES", ShowLevelSelect, false); Anchor(levels, .5f, .30f, 650, 96);
             var progress = Text(_screen.transform, "Progress", $"{_save.Data.completed.Count} / 250 complete", 27, _theme.muted, FontStyles.Normal, TextAlignmentOptions.Center); Anchor(progress.rectTransform, .5f, .21f, 600, 60);
             var footer = Text(_screen.transform, "Footer", "Offline campaign  •  No forced ads  •  Progress backed up", 20, _theme.muted, FontStyles.Normal, TextAlignmentOptions.Center); Anchor(footer.rectTransform, .5f, .07f, 820, 54);
