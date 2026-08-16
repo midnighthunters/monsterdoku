@@ -20,7 +20,7 @@ namespace MonsterLogic.UI
         private Canvas _canvas; private RectTransform _safeRoot; private GameObject _screen; private PuzzleSession _session;
         private readonly List<CellView> _cells = new List<CellView>(); private TMP_Text _progress, _hearts, _timer, _hintText, _placeActionLabel;
         private Image _placeActionArt, _placeActionRing;
-        private Texture2D _appIcon; private Sprite _activeVillainSprite; private bool _placeMode, _initialized;
+        private Texture2D _appIcon; private Sprite _activeVillainSprite; private bool _placeMode, _initialized, _hideInitialClueVisuals;
 
         public void Initialize(PuzzleLevelDatabase database, SaveService save, IAdService ads, TMP_FontAsset displayFont = null, TMP_FontAsset bodyFont = null)
         {
@@ -119,8 +119,10 @@ namespace MonsterLogic.UI
             var level = _database.GetByNumber(Mathf.Clamp(number, 1, 250)); if (level == null) return;
             _placeMode = false;
             _activeVillainSprite = VillainSprite(VillainGauntlet.Resolve(level.displayNumber));
+            bool restoringSession = _save.HasSessionFor(level);
+            _hideInitialClueVisuals = !restoringSession;
             _session = new PuzzleSession(level);
-            if (_save.HasSessionFor(level)) _session.Restore(_save.Data.inProgressMonsters, _save.Data.inProgressPlayerNotes, _save.Data.inProgressHearts, _save.Data.inProgressMistakes, _save.Data.inProgressSeconds);
+            if (restoringSession) _session.Restore(_save.Data.inProgressMonsters, _save.Data.inProgressPlayerNotes, _save.Data.inProgressHearts, _save.Data.inProgressMistakes, _save.Data.inProgressSeconds);
             else _save.ClearInProgress(false);
             _session.Changed += OnSessionChanged; _session.MistakeMade += OnMistake; _session.Completed += OnCompleted;
             BeginScreen("Game"); AddBackdrop(_screen.transform, level.chapterId - 1);
@@ -282,6 +284,12 @@ namespace MonsterLogic.UI
 
         private void OnCellActivated(int cell, bool monsterAction)
         {
+            if (_hideInitialClueVisuals)
+            {
+                _hideInitialClueVisuals = false;
+                RefreshBoard();
+            }
+
             bool placeVillain = _placeMode || monsterAction;
             if (_save.Data.settings.accessibilityCycle && !_placeMode) _session.Cycle(cell); else if (placeVillain) _session.ToggleMonster(cell); else _session.ToggleNote(cell);
             _audio.Play(placeVillain ? "monster" : "x");
@@ -295,6 +303,7 @@ namespace MonsterLogic.UI
             for (int i = 0; i < _cells.Count; i++)
             {
                 var view = _cells[i]; var mark = _session.GetMark(i); view.Mark.text = ""; view.Mark.fontSize = view.BaseFontSize; view.Monster.enabled = false; view.LockBadge.enabled = false; view.RegionSymbol.enabled = _save.Data.settings.regionSymbols;
+                if (_hideInitialClueVisuals && (mark == CellMark.LockedMonster || mark == CellMark.AutomaticX)) continue;
                 if (mark == CellMark.PlayerX) { view.Mark.text = "X"; view.Mark.color = _theme.ink; }
                 else if (mark == CellMark.AutomaticX) { view.Mark.text = "X"; view.Mark.color = _save.Data.settings.automaticNotesIdentical ? _theme.ink : Color.Lerp(_theme.muted, view.Background.color, .25f); view.Mark.fontSize *= .88f; }
                 else if (mark == CellMark.Monster || mark == CellMark.LockedMonster)
@@ -305,7 +314,8 @@ namespace MonsterLogic.UI
                     view.LockBadge.enabled = mark == CellMark.LockedMonster;
                 }
             }
-            _progress.text = $"{_session.Monsters.Count(x => x)}/{n}  MONSTERS"; _hearts.text = $"HEARTS  {_session.Hearts}";
+            int visibleMonsterCount = _hideInitialClueVisuals ? 0 : _session.Monsters.Count(x => x);
+            _progress.text = $"{visibleMonsterCount}/{n}  MONSTERS"; _hearts.text = $"HEARTS  {_session.Hearts}";
         }
 
         private void OnSessionChanged() { RefreshBoard(); PersistSession(); }

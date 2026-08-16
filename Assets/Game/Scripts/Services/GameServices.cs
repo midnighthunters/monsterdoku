@@ -49,8 +49,10 @@ namespace MonsterLogic.Services
             Data.inProgressHearts = session.Hearts; Data.inProgressMistakes = session.Mistakes; Data.inProgressSeconds = session.ElapsedSeconds; Save();
         }
 
+        // A timer alone does not represent player progress. Treat it as a fresh board so
+        // interrupted, untouched levels do not restore their authored clue visuals.
         public bool HasSessionFor(PuzzleLevelData level) => level != null && Data.currentLevelId == level.levelId &&
-            ((Data.inProgressMonsters?.Length ?? 0) > 0 || (Data.inProgressPlayerNotes?.Length ?? 0) > 0 || Data.inProgressMistakes > 0 || Data.inProgressSeconds > 1f);
+            ((Data.inProgressMonsters?.Length ?? 0) > 0 || (Data.inProgressPlayerNotes?.Length ?? 0) > 0 || Data.inProgressMistakes > 0);
 
         public void ClearInProgress(bool save = true)
         {
