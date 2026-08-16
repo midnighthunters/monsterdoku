@@ -8,6 +8,9 @@ namespace MonsterLogic.Puzzle
 
     public sealed class PuzzleSession
     {
+        public const int DefaultVillainBoosters = 1;
+        public const int DefaultHintBoosters = 1;
+
         private sealed class Snapshot
         {
             public bool[] monsters;
@@ -20,6 +23,8 @@ namespace MonsterLogic.Puzzle
         public int[] AutomaticNoteSources { get; private set; }
         public int Hearts { get; private set; }
         public int Mistakes { get; private set; }
+        public int VillainBoosters { get; private set; }
+        public int HintBoosters { get; private set; }
         public bool IsComplete { get; private set; }
         public float ElapsedSeconds { get; set; }
         public event Action Changed;
@@ -36,11 +41,13 @@ namespace MonsterLogic.Puzzle
             Level = level ?? throw new ArgumentNullException(nameof(level));
             int count = level.gridSize * level.gridSize;
             Monsters = new bool[count]; PlayerNotes = new bool[count]; AutomaticNoteSources = new int[count];
-            Hearts = 3; Mistakes = 0; IsComplete = false; ElapsedSeconds = 0; _hintStage = 0; _history.Clear();
+            Hearts = 3; Mistakes = 0; VillainBoosters = DefaultVillainBoosters; HintBoosters = DefaultHintBoosters;
+            IsComplete = false; ElapsedSeconds = 0; _hintStage = 0; _history.Clear();
             RebuildAutomaticNotes(); Changed?.Invoke();
         }
 
-        public bool Restore(IEnumerable<int> monsterCells, IEnumerable<int> playerNoteCells, int hearts, int mistakes, float elapsedSeconds)
+        public bool Restore(IEnumerable<int> monsterCells, IEnumerable<int> playerNoteCells, int hearts, int mistakes, float elapsedSeconds,
+            int villainBoosters = DefaultVillainBoosters, int hintBoosters = DefaultHintBoosters)
         {
             if (Level == null) return false;
             int count = Level.gridSize * Level.gridSize;
@@ -53,7 +60,9 @@ namespace MonsterLogic.Puzzle
                 if (cell >= 0 && cell < count && !restoredMonsters[cell]) restoredNotes[cell] = true;
 
             Monsters = restoredMonsters; PlayerNotes = restoredNotes;
-            Hearts = Math.Max(0, Math.Min(3, hearts)); Mistakes = Math.Max(0, mistakes); ElapsedSeconds = Math.Max(0, elapsedSeconds);
+            Hearts = Math.Max(0, Math.Min(3, hearts)); Mistakes = Math.Max(0, mistakes);
+            VillainBoosters = Math.Max(0, villainBoosters); HintBoosters = Math.Max(0, hintBoosters);
+            ElapsedSeconds = Math.Max(0, elapsedSeconds);
             IsComplete = PuzzleRules.PlacementsSatisfyAll(Level, Monsters); _history.Clear(); _hintStage = 0;
             RebuildAutomaticNotes(); Changed?.Invoke(); return true;
         }
@@ -110,6 +119,22 @@ namespace MonsterLogic.Puzzle
             int previous = Hearts;
             Hearts = Math.Min(3, Hearts + amount);
             if (Hearts == previous) return false;
+            Changed?.Invoke();
+            return true;
+        }
+
+        public bool TryConsumeVillainBooster()
+        {
+            if (Level == null || IsComplete || Hearts <= 0 || VillainBoosters <= 0) return false;
+            VillainBoosters--;
+            Changed?.Invoke();
+            return true;
+        }
+
+        public bool TryConsumeHintBooster()
+        {
+            if (Level == null || IsComplete || Hearts <= 0 || HintBoosters <= 0) return false;
+            HintBoosters--;
             Changed?.Invoke();
             return true;
         }

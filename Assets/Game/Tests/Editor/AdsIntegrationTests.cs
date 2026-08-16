@@ -72,6 +72,31 @@ namespace MonsterLogic.Tests.Editor
         }
 
         [Test]
+        public void BoosterCountsStartAtOnePersistAtZeroAndCannotBeRestoredByUndo()
+        {
+            var level = Resources.Load<PuzzleLevelDatabase>("PuzzleLevelDatabase").GetByNumber(2);
+            var session = new PuzzleSession(level);
+            int correct = level.Cell(0, level.solutionColumnByRow[0]);
+            session.ToggleMonster(correct);
+
+            Assert.That(session.VillainBoosters, Is.EqualTo(1));
+            Assert.That(session.HintBoosters, Is.EqualTo(1));
+            Assert.That(session.TryConsumeVillainBooster(), Is.True);
+            Assert.That(session.TryConsumeHintBooster(), Is.True);
+            Assert.That(session.Undo(), Is.True);
+            Assert.That(session.VillainBoosters, Is.Zero);
+            Assert.That(session.HintBoosters, Is.Zero);
+
+            WithTemporarySave(save =>
+            {
+                save.StoreSession(session);
+                Assert.That(save.Data.inProgressVillainBoosters, Is.Zero);
+                Assert.That(save.Data.inProgressHintBoosters, Is.Zero);
+                Assert.That(save.HasSessionFor(level), Is.True, "Spent boosters must keep the puzzle resumable even before a board mark is saved.");
+            });
+        }
+
+        [Test]
         public void RewardStateMachineCompletesExactlyOnceForAllCallbackOrders()
         {
             var earned = new RewardedAdStateMachine();
@@ -136,6 +161,22 @@ namespace MonsterLogic.Tests.Editor
                 int[] placed = session.Monsters.Select((value, cell) => (value, cell)).Where(item => item.value).Select(item => item.cell).ToArray();
                 Assert.That(placed, Has.Length.EqualTo(1));
                 Assert.That(session.Level.IsSolutionCell(placed[0]), Is.True);
+            });
+        }
+
+        [Test]
+        public void ZeroCountBoosterButtonsOpenTheirMatchingRewardedAds()
+        {
+            WithAppHarness((app, session, fake) =>
+            {
+                Assert.That(session.TryConsumeHintBooster(), Is.True);
+                fake.NextRewardedResult = RewardedAdResult.DismissedWithoutReward;
+                InvokePrivate(app, "UseHintBoosterOrAd");
+                Assert.That(fake.LastRewardPlacement, Is.EqualTo(RewardPlacement.Hint));
+
+                Assert.That(session.TryConsumeVillainBooster(), Is.True);
+                InvokePrivate(app, "UseVillainBoosterOrAd");
+                Assert.That(fake.LastRewardPlacement, Is.EqualTo(RewardPlacement.RevealVillain));
             });
         }
 

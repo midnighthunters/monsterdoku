@@ -19,10 +19,13 @@ namespace MonsterLogic.UI
         private PuzzleLevelDatabase _database; private SaveService _save; private IAdService _ads; private AdPolicy _adPolicy;
         private AudioService _audio; private HapticService _haptics; private ThemePalette _theme; private TMP_FontAsset _font, _displayFont;
         private Canvas _canvas; private RectTransform _safeRoot, _contentRoot; private BannerAwareContentLayout _bannerLayout; private GameObject _screen, _toast; private PuzzleSession _session;
-        private readonly List<CellView> _cells = new List<CellView>(); private TMP_Text _progress, _hearts, _timer, _hintText, _placeActionLabel;
-        private Image _placeActionArt, _placeActionRing;
-        private Texture2D _appIcon, _zemoLogo; private Sprite[] _crossSprites; private Sprite _lockSprite, _activeVillainSprite, _activeCrossSprite;
-        private bool _placeMode, _initialized, _adActionInProgress, _adBreakActive, _screenWantsBanner; private int _overlayDepth; private long _completionToken;
+        private readonly List<CellView> _cells = new List<CellView>(); private TMP_Text _progress, _hearts, _timer, _hintText;
+        private TMP_Text _villainBoosterCount, _hintBoosterCount;
+        private Image _villainAdBadge, _hintAdBadge;
+        private Texture2D _appIcon, _zemoLogo; private Sprite[] _crossSprites;
+        private Sprite _lockSprite, _activeVillainSprite, _activeCrossSprite, _hintBoosterSprite, _playAdSprite;
+        private Material _crossImprintMaterial;
+        private bool _initialized, _adActionInProgress, _adBreakActive, _screenWantsBanner; private int _overlayDepth; private long _completionToken;
 
         private const string FeedbackUrl = "mailto:support@zemolabs.com?subject=Monster%20Logic%20Feedback";
         private const string TermsUrl = "https://zemolabs.com/terms";
@@ -40,6 +43,9 @@ namespace MonsterLogic.UI
             _font = bodyFont != null ? bodyFont : TMP_Settings.defaultFontAsset; _displayFont = displayFont != null ? displayFont : _font;
             _appIcon = Resources.Load<Texture2D>("AppIcon");
             _zemoLogo = Resources.Load<Texture2D>("logo");
+            _hintBoosterSprite = Resources.LoadAll<Sprite>("hint").FirstOrDefault();
+            _playAdSprite = Resources.LoadAll<Sprite>("play").FirstOrDefault();
+            _crossImprintMaterial = Resources.Load<Material>("CrossImprint");
             _lockSprite = Resources.LoadAll<Sprite>("lock").FirstOrDefault(sprite => sprite != null && sprite.name == "lock_0");
             _crossSprites = Resources.LoadAll<Sprite>("cross")
                 .Where(sprite => sprite != null)
@@ -182,12 +188,13 @@ namespace MonsterLogic.UI
         public void StartLevel(int number)
         {
             var level = _database.GetByNumber(Mathf.Clamp(number, 1, 250)); if (level == null) return;
-            _placeMode = false;
             _activeVillainSprite = VillainSprite(VillainGauntlet.Resolve(level.displayNumber));
             _activeCrossSprite = _crossSprites.Length == 0 ? null : _crossSprites[(level.displayNumber - 1) % _crossSprites.Length];
             bool restoringSession = _save.HasSessionFor(level);
             _session = new PuzzleSession(level);
-            if (restoringSession) _session.Restore(_save.Data.inProgressMonsters, _save.Data.inProgressPlayerNotes, _save.Data.inProgressHearts, _save.Data.inProgressMistakes, _save.Data.inProgressSeconds);
+            if (restoringSession) _session.Restore(_save.Data.inProgressMonsters, _save.Data.inProgressPlayerNotes,
+                _save.Data.inProgressHearts, _save.Data.inProgressMistakes, _save.Data.inProgressSeconds,
+                _save.Data.inProgressVillainBoosters, _save.Data.inProgressHintBoosters);
             else _save.ClearInProgress(false);
             _session.Changed += OnSessionChanged; _session.MistakeMade += OnMistake; _session.Completed += OnCompleted;
             BeginScreen("Game"); AddBackdrop(_screen.transform, level.chapterId - 1);
@@ -219,7 +226,10 @@ namespace MonsterLogic.UI
             {
                 int index = cell, region = level.regionIdByCell[cell]; var go = new GameObject($"Cell_{cell / n}_{cell % n}", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(CellView)); go.transform.SetParent(board, false);
                 var bg = go.GetComponent<Image>(); bg.color = _theme.regions[region % _theme.regions.Length];
-                var emptyIcon = SpriteImage(go.transform, "EmptyIcon", _activeCrossSprite); emptyIcon.color = _activeCrossSprite == null ? Color.clear : new Color(1f, 1f, 1f, .78f); Anchor(emptyIcon.rectTransform, .5f, .5f, grid.cellSize.x * .94f, grid.cellSize.y * .94f);
+                var emptyIcon = SpriteImage(go.transform, "EmptyIcon", _activeCrossSprite);
+                emptyIcon.material = _crossImprintMaterial;
+                emptyIcon.color = _activeCrossSprite == null ? Color.clear : new Color(.58f, .58f, .62f, .22f);
+                Anchor(emptyIcon.rectTransform, .5f, .5f, grid.cellSize.x * .94f, grid.cellSize.y * .94f);
                 var mark = Text(go.transform, "Mark", "", Mathf.RoundToInt(170f / n), _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Stretch(mark.rectTransform); mark.raycastTarget = false;
                 var monsterGo = new GameObject("Monster", typeof(RectTransform), typeof(Image)); monsterGo.transform.SetParent(go.transform, false); var monster = monsterGo.GetComponent<Image>(); monster.sprite = _activeVillainSprite; monster.preserveAspect = true; monster.color = _activeVillainSprite == null ? Color.clear : Color.white; monster.raycastTarget = false; Anchor(monster.rectTransform, .5f, .52f, grid.cellSize.x * .94f, grid.cellSize.y * .94f);
                 var regionSymbol = Text(go.transform, "Region", ((char)('A' + region)).ToString(), Mathf.RoundToInt(50f / n + 9), Color.Lerp(_theme.ink, bg.color, .35f), FontStyles.Bold, TextAlignmentOptions.Center); Anchor(regionSymbol.rectTransform, .17f, .82f, 26, 26); regionSymbol.raycastTarget = false;
@@ -227,56 +237,53 @@ namespace MonsterLogic.UI
             }
         }
 
-        // The selected villain is a deliberate, single-tap mode. It gives the board
-        // the same directness as a physical puzzle piece while preserving tap-to-X.
         private void BuildGameplayActions(PuzzleLevelData level)
         {
-            var actions = Container(_screen.transform, "GameplayActions"); Anchor(actions, .5f, .09f, 800, 122);
-            Color villainAccent = VillainAccent(VillainGauntlet.Resolve(level.displayNumber));
-            var villain = BuildActionPill(actions, "PlaceVillain", villainAccent, TogglePlaceMode);
-            Anchor(villain, .16f, .5f, 244, 106);
-            _placeActionArt = SpriteImage(villain, "VillainArt", _activeVillainSprite); Anchor(_placeActionArt.rectTransform, .22f, .5f, 62, 62);
-            if (_activeVillainSprite == null)
-            {
-                var fallback = DisplayText(villain, "VillainFallback", "◆", 34, Color.white, TextAlignmentOptions.Center); Anchor(fallback.rectTransform, .22f, .5f, 60, 60);
-            }
-            _placeActionLabel = Text(villain, "ActionLabel", "PLACE\nVILLAIN", 17, Color.white, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(_placeActionLabel.rectTransform, .67f, .5f, 142, 66);
-            _placeActionRing = villain.GetComponent<Image>();
+            var actions = Container(_screen.transform, "GameplayActions"); Anchor(actions, .5f, .085f, 430, 148);
+            var villain = BuildBoosterIcon(actions, "VillainBooster", _activeVillainSprite, UseVillainBoosterOrAd,
+                out _villainBoosterCount, out _villainAdBadge);
+            Anchor(villain, .30f, .5f, 150, 142);
 
-            var reveal = BuildActionPill(actions, "RewardedReveal", Color.Lerp(villainAccent, _theme.accent, .35f), RequestRewardedVillainReveal);
-            Anchor(reveal, .5f, .5f, 244, 106);
-            var revealArt = SpriteImage(reveal, "VillainArt", _activeVillainSprite); Anchor(revealArt.rectTransform, .20f, .5f, 58, 58);
-            var revealLabel = Text(reveal, "ActionLabel", "WATCH AD\nREVEAL", 16, Color.white, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(revealLabel.rectTransform, .66f, .5f, 150, 66);
-
-            var hint = BuildActionPill(actions, "RewardedHint", Color.Lerp(_theme.success, _theme.accent, .35f), RequestRewardedHint);
-            Anchor(hint, .84f, .5f, 244, 106);
-            var hintGlyph = Icon(hint, "HintGlyph", RuntimeIcon.Hint, Color.white); Anchor(hintGlyph.rectTransform, .20f, .5f, 54, 54);
-            var hintLabel = Text(hint, "ActionLabel", "WATCH AD\nFOR HINT", 16, Color.white, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(hintLabel.rectTransform, .66f, .5f, 150, 66);
+            var hintSprite = _hintBoosterSprite != null ? _hintBoosterSprite : RuntimeArt.IconSprite(RuntimeIcon.Hint);
+            var hint = BuildBoosterIcon(actions, "HintBooster", hintSprite, UseHintBoosterOrAd,
+                out _hintBoosterCount, out _hintAdBadge);
+            Anchor(hint, .70f, .5f, 150, 142);
+            RefreshBoosterBar();
         }
 
-        private RectTransform BuildActionPill(Transform parent, string name, Color color, Action action)
+        private RectTransform BuildBoosterIcon(Transform parent, string name, Sprite sprite, Action action,
+            out TMP_Text countText, out Image playBadge)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button)); go.transform.SetParent(parent, false);
-            var image = go.GetComponent<Image>(); image.color = color; image.sprite = RuntimeArt.RoundedSprite(32); image.type = UnityEngine.UI.Image.Type.Sliced; Elevate(image, 5f);
-            var button = go.GetComponent<Button>(); button.targetGraphic = image;
+            var hitArea = go.GetComponent<Image>(); hitArea.color = Color.clear;
+            var icon = SpriteImage(go.transform, "Icon", sprite); icon.color = sprite == null ? Color.clear : Color.white; icon.raycastTarget = false; Anchor(icon.rectTransform, .5f, .60f, 112, 112);
+            if (sprite == null)
+            {
+                var fallback = DisplayText(go.transform, "Fallback", "◆", 48, _theme.accent, TextAlignmentOptions.Center); Anchor(fallback.rectTransform, .5f, .60f, 100, 100);
+            }
+
+            var badge = Image(go.transform, "CountBadge", new Color(.055f, .045f, .13f, .96f));
+            badge.sprite = RuntimeArt.RoundedSprite(24); badge.type = UnityEngine.UI.Image.Type.Sliced; badge.raycastTarget = false; Anchor(badge.rectTransform, .5f, .08f, 58, 44);
+            countText = Text(badge.transform, "Count", string.Empty, 24, Color.white, FontStyles.Bold, TextAlignmentOptions.Center); Stretch(countText.rectTransform); countText.raycastTarget = false;
+            playBadge = SpriteImage(badge.transform, "PlayAd", _playAdSprite); playBadge.raycastTarget = false; Anchor(playBadge.rectTransform, .5f, .5f, 38, 38);
+            var button = go.GetComponent<Button>(); button.targetGraphic = hitArea;
             var colors = button.colors; colors.normalColor = Color.white; colors.highlightedColor = new Color(.96f, .96f, 1f); colors.pressedColor = new Color(.76f, .76f, .84f); button.colors = colors;
             button.onClick.AddListener(() => { if (_adBreakActive) return; _audio?.Play("tap"); action?.Invoke(); });
-            var rim = Image(go.transform, "Rim", new Color(1f, 1f, 1f, .18f)); rim.sprite = RuntimeArt.RoundedSprite(28); rim.type = UnityEngine.UI.Image.Type.Sliced; Stretch(rim.rectTransform); rim.rectTransform.offsetMin = new Vector2(7f, 7f); rim.rectTransform.offsetMax = new Vector2(-7f, -7f); rim.raycastTarget = false;
             return (RectTransform)go.transform;
         }
 
-        private void TogglePlaceMode() => SetPlaceMode(!_placeMode);
-
-        private void SetPlaceMode(bool enabled)
+        private void RefreshBoosterBar()
         {
-            _placeMode = enabled;
-            if (_placeActionLabel != null) _placeActionLabel.text = enabled ? "SELECTED\nTAP A CELL" : "PLACE\nVILLAIN";
-            if (_placeActionRing != null && _session != null)
-            {
-                Color accent = VillainAccent(VillainGauntlet.Resolve(_session.Level.displayNumber));
-                _placeActionRing.color = enabled ? Color.Lerp(accent, Color.white, .20f) : accent;
-            }
-            if (_hintText != null && _session != null) _hintText.text = enabled ? "Villain selected — tap an open cell to place it." : TutorialCopy(_session.Level.displayNumber);
+            if (_session == null) return;
+            RefreshBoosterBadge(_villainBoosterCount, _villainAdBadge, _session.VillainBoosters);
+            RefreshBoosterBadge(_hintBoosterCount, _hintAdBadge, _session.HintBoosters);
+        }
+
+        private static void RefreshBoosterBadge(TMP_Text countText, Image playBadge, int count)
+        {
+            bool hasCharge = count > 0;
+            if (countText != null) { countText.enabled = hasCharge; countText.text = count.ToString(); }
+            if (playBadge != null) playBadge.enabled = !hasCharge;
         }
 
         private IEnumerator ShowVillainUnlockIfNeeded(int levelNumber)
@@ -398,14 +405,11 @@ namespace MonsterLogic.UI
         {
             if (_session == null || _adBreakActive) return;
 
-            bool placeVillain = monsterAction || _placeMode;
-            bool wasMonster = cell >= 0 && cell < _session.Monsters.Length && _session.Monsters[cell];
+            bool placeVillain = monsterAction;
             if (_save.Data.settings.accessibilityCycle && !placeVillain) _session.Cycle(cell);
             else if (placeVillain) _session.ToggleMonster(cell);
             else _session.ToggleNote(cell);
 
-            bool monsterChanged = cell >= 0 && cell < _session.Monsters.Length && wasMonster != _session.Monsters[cell];
-            if (_placeMode && monsterChanged) SetPlaceMode(false);
             _audio.Play(placeVillain ? "monster" : "x");
             if (_session.Hearts <= 0) ShowOutOfHearts();
         }
@@ -429,7 +433,7 @@ namespace MonsterLogic.UI
             _progress.text = $"{visibleMonsterCount}/{n}  MONSTERS"; _hearts.text = $"HEARTS  {_session.Hearts}";
         }
 
-        private void OnSessionChanged() { RefreshBoard(); PersistSession(); }
+        private void OnSessionChanged() { RefreshBoard(); RefreshBoosterBar(); PersistSession(); }
         private void PersistSession() { if (_session != null && !_session.IsComplete) _save.StoreSession(_session); }
         private void RestartCurrentLevel() { if (_session == null) return; int number = _session.Level.displayNumber; _save.ClearInProgress(); StartLevel(number); }
 
@@ -509,6 +513,27 @@ namespace MonsterLogic.UI
             {
                 var chapters = Button(card, "Chapters", "CHAPTERS", () => { CloseOverlay(overlay.gameObject); ShowLevelSelect(); }, false); Anchor(chapters, .5f, .055f, 580, 62);
             }
+        }
+
+        private void UseHintBoosterOrAd()
+        {
+            var session = _session;
+            if (session == null || session.IsComplete || session.Hearts <= 0 || _adBreakActive) return;
+            if (session.HintBoosters <= 0) { RequestRewardedHint(); return; }
+            if (session.TryConsumeHintBooster()) ApplyHintReward(session);
+        }
+
+        private void UseVillainBoosterOrAd()
+        {
+            var session = _session;
+            if (session == null || session.IsComplete || session.Hearts <= 0 || _adBreakActive) return;
+            if (GetRevealCandidates(session).Length == 0)
+            {
+                ShowToast("Every villain position is already revealed.");
+                return;
+            }
+            if (session.VillainBoosters <= 0) { RequestRewardedVillainReveal(); return; }
+            if (session.TryConsumeVillainBooster()) ApplyVillainRevealReward(session);
         }
 
         private void RequestRewardedHint()
@@ -818,7 +843,7 @@ namespace MonsterLogic.UI
         private static void Anchor(RectTransform rect, float x, float y, float width, float height) { rect.anchorMin = rect.anchorMax = new Vector2(x, y); rect.pivot = new Vector2(.5f, .5f); rect.sizeDelta = new Vector2(width, height); rect.anchoredPosition = Vector2.zero; }
         private static string FormatTime(float seconds) => $"{Mathf.FloorToInt(seconds / 60)}:{Mathf.FloorToInt(seconds % 60):00}";
         private static int ParseNumber(string id) => int.TryParse(id?.Split('-').LastOrDefault(), out int n) ? n : 0;
-        private static string TutorialCopy(int level) => level switch { 1 => "Tap once to mark an impossible cell with X.", 2 => "Tap PLACE VILLAIN, then tap a cell.", 3 => "Every coloured region needs exactly one villain.", 4 => "Every row and column needs exactly one villain.", 5 => "Regions can bend—follow each colour shape.", 6 => "Villains cannot touch, even at the corners.", <= 10 => "Combine all four rules. Hints explain before they reveal.", _ => "Tap a cell for X  ·  Select PLACE VILLAIN to place" };
+        private static string TutorialCopy(int level) => level switch { 1 => "Tap once for X. Double-tap or hold to place a villain.", 2 => "The two bottom icons are optional villain and hint boosters.", 3 => "Every coloured region needs exactly one villain.", 4 => "Every row and column needs exactly one villain.", 5 => "Regions can bend—follow each colour shape.", 6 => "Villains cannot touch, even at the corners.", <= 10 => "Combine all four rules. Hints explain before they reveal.", _ => "Tap for X  ·  Double-tap or hold to place a villain" };
     }
 
     internal enum RuntimeIcon { Gear, Sound, Music, Haptic, Hint, Close }
