@@ -345,7 +345,7 @@ namespace MonsterLogic.UI
         private void ShowVillainUnlock(VillainTier tier)
         {
             Color accent = VillainAccent(tier);
-            var overlay = Panel(_canvas.transform, "VillainUnlockOverlay", new Color(.025f, .02f, .08f, .88f)); Stretch(overlay); overlay.SetAsLastSibling();
+            var overlay = BeginOverlay("VillainUnlockOverlay", new Color(.025f, .02f, .08f, .88f));
             overlay.GetComponent<Image>().raycastTarget = true; // Full-screen input shield; no board input can pass through.
             var halo = Image(overlay, "SummoningHalo", new Color(accent.r, accent.g, accent.b, .12f)); halo.sprite = RuntimeArt.DiscSprite(); Anchor(halo.rectTransform, .5f, .52f, 820, 820);
             var frame = Panel(overlay, "UnlockFrame", Color.Lerp(accent, new Color(.03f, .025f, .10f), .80f)); Anchor(frame, .5f, .50f, 774, 1044);
@@ -366,7 +366,7 @@ namespace MonsterLogic.UI
             var name = DisplayText(card, "VillainName", tier.villain.displayName, 45, accent, TextAlignmentOptions.Center); Anchor(name.rectTransform, .5f, .275f, 640, 72);
             var band = Text(card, "VillainBand", tier.LevelRangeLabel, 25, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(band.rectTransform, .5f, .215f, 500, 44);
             var copy = Text(card, "HuntCopy", "A new adversary has stepped from the dark.\nStudy the pattern. Break the curse.", 22, _theme.muted, FontStyles.Normal, TextAlignmentOptions.Center); Anchor(copy.rectTransform, .5f, .145f, 620, 72);
-            var begin = Button(card, "BeginHunt", "BEGIN THE HUNT", () => { _save.AcknowledgeVillainTier(tier.AcknowledgementId); Destroy(overlay.gameObject); });
+            var begin = Button(card, "BeginHunt", "BEGIN THE HUNT", () => { _save.AcknowledgeVillainTier(tier.AcknowledgementId); CloseOverlay(overlay.gameObject); });
             begin.GetComponent<Image>().color = accent; Anchor(begin, .5f, .065f, 590, 84);
             _audio.Play("panel");
         }
@@ -661,37 +661,109 @@ namespace MonsterLogic.UI
 
         private void ShowSettings()
         {
-            if (GameObject.Find("SettingsOverlay") != null) return;
-            var overlayImage = Image(_canvas.transform, "SettingsOverlay", new Color(.05f, .035f, .09f, .76f));
-            var overlay = overlayImage.rectTransform; Stretch(overlay); overlay.SetAsLastSibling();
-            overlayImage.raycastTarget = true;
-            var sheet = Panel(overlay, "SettingsSheet", new Color(.985f, .955f, .90f, 1f)); Anchor(sheet, .5f, .50f, 760, 720);
+            if (_adBreakActive || GameObject.Find("SettingsOverlay") != null) return;
+            var overlay = BeginOverlay("SettingsOverlay", new Color(.05f, .035f, .09f, .76f));
+            overlay.GetComponent<Image>().raycastTarget = true;
+            var sheet = Panel(overlay, "SettingsSheet", new Color(.985f, .955f, .90f, 1f)); Anchor(sheet, .5f, .50f, 760, 820);
             var header = Image(sheet, "Header", new Color(.94f, .86f, .78f)); header.sprite = RuntimeArt.RoundedSprite(28); header.type = UnityEngine.UI.Image.Type.Sliced; Anchor(header.rectTransform, .5f, .94f, 760, 132);
             var title = DisplayText(sheet, "Title", "SETTINGS", 52, new Color(.35f, .18f, .25f), TextAlignmentOptions.Center); title.outlineWidth = 0; Anchor(title.rectTransform, .5f, .94f, 490, 78);
-            var close = IconButton(sheet, "Close", RuntimeIcon.Close, () => Destroy(overlay.gameObject)); Anchor(close, .90f, .94f, 70, 70);
+            var close = IconButton(sheet, "Close", RuntimeIcon.Close, () => CloseOverlay(overlay.gameObject)); Anchor(close, .90f, .94f, 70, 70);
 
-            var feedback = Button(sheet, "Feedback", "SEND FEEDBACK", () => Application.OpenURL(FeedbackUrl)); Anchor(feedback, .5f, .62f, 620, 96);
-            var terms = Button(sheet, "TermsOfService", "TERMS OF SERVICE", () => Application.OpenURL(TermsUrl), false); Anchor(terms, .5f, .39f, 620, 76);
+            var feedback = Button(sheet, "Feedback", "SEND FEEDBACK", () => Application.OpenURL(FeedbackUrl)); Anchor(feedback, .5f, .68f, 620, 96);
+            var terms = Button(sheet, "TermsOfService", "TERMS OF SERVICE", () => Application.OpenURL(TermsUrl), false); Anchor(terms, .5f, .49f, 620, 76);
             terms.GetComponent<Image>().color = Color.white; terms.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
-            var privacy = Button(sheet, "PrivacyPolicy", "PRIVACY POLICY", () => Application.OpenURL(PrivacyUrl), false); Anchor(privacy, .5f, .24f, 620, 76);
+            var privacy = Button(sheet, "PrivacyPolicy", "PRIVACY POLICY", () => Application.OpenURL(PrivacyUrl), false); Anchor(privacy, .5f, .35f, 620, 76);
             privacy.GetComponent<Image>().color = Color.white; privacy.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
+            var privacyStatus = Text(sheet, "PrivacyStatus", string.Empty, 18, new Color(.66f, .25f, .20f), FontStyles.Bold, TextAlignmentOptions.Center); Anchor(privacyStatus.rectTransform, .5f, .09f, 620, 46);
+            var choices = Button(sheet, "PrivacyChoices", "PRIVACY CHOICES", () =>
+            {
+                _ads.ShowPrivacyOptions(opened => privacyStatus.text = opened ? string.Empty : "Privacy choices are unavailable while ads are disabled.");
+            }, false);
+            choices.GetComponent<Image>().color = Color.white; choices.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f); Anchor(choices, .5f, .21f, 620, 76);
         }
 
         private void ShowModal(string title, string body, string primary, Action primaryAction, string secondary, Action secondaryAction)
         {
-            var overlay = Panel(_canvas.transform, "ModalOverlay", new Color(0.05f, .03f, .12f, .72f)); Stretch(overlay); overlay.SetAsLastSibling();
+            var overlay = BeginOverlay("ModalOverlay", new Color(0.05f, .03f, .12f, .72f));
             var card = Panel(overlay, "ModalCard", _theme.panel); Anchor(card, .5f, .5f, 720, 560);
             var icon = Text(card, "Icon", "*", 84, _theme.accent, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(icon.rectTransform, .5f, .78f, 150, 120);
             var head = Text(card, "Title", title, 43, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(head.rectTransform, .5f, .62f, 640, 100);
             var copy = Text(card, "Body", body, 26, _theme.muted, FontStyles.Normal, TextAlignmentOptions.Center); Anchor(copy.rectTransform, .5f, .45f, 620, 120);
-            var p = Button(card, "Primary", primary, () => { Destroy(overlay.gameObject); primaryAction?.Invoke(); }); Anchor(p, .5f, .24f, 580, 92);
-            var s = Button(card, "Secondary", secondary, () => { Destroy(overlay.gameObject); secondaryAction?.Invoke(); }, false); Anchor(s, .5f, .08f, 580, 76);
+            var p = Button(card, "Primary", primary, () => { CloseOverlay(overlay.gameObject); primaryAction?.Invoke(); }); Anchor(p, .5f, .24f, 580, 92);
+            var s = Button(card, "Secondary", secondary, () => { CloseOverlay(overlay.gameObject); secondaryAction?.Invoke(); }, false); Anchor(s, .5f, .08f, 580, 76);
             _audio.Play("panel");
         }
 
         private void BeginScreen(string name)
         {
-            if (_screen != null) Destroy(_screen); _screen = new GameObject(name, typeof(RectTransform)); _screen.transform.SetParent(_safeRoot, false); Stretch((RectTransform)_screen.transform);
+            if (_screen != null) Destroy(_screen); _screen = new GameObject(name, typeof(RectTransform)); _screen.transform.SetParent(_contentRoot, false); Stretch((RectTransform)_screen.transform);
+            _screenWantsBanner = name == "Home" || name == "LevelSelect" || name == "Chapter" || name == "Game";
+            UpdateBannerDesiredState();
+        }
+
+        private RectTransform BeginOverlay(string name, Color color)
+        {
+            var overlay = Panel(_contentRoot, name, color); Stretch(overlay); overlay.SetAsLastSibling();
+            overlay.GetComponent<Image>().raycastTarget = true;
+            _overlayDepth++;
+            UpdateBannerDesiredState();
+            return overlay;
+        }
+
+        private void CloseOverlay(GameObject overlay)
+        {
+            if (overlay == null) return;
+            Destroy(overlay);
+            _overlayDepth = Mathf.Max(0, _overlayDepth - 1);
+            UpdateBannerDesiredState();
+        }
+
+        private void OnFullscreenAdStateChanged(bool active)
+        {
+            _adBreakActive = active || _adActionInProgress;
+            UpdateBannerDesiredState();
+        }
+
+        private void OnBannerHeightChanged(float pixels)
+        {
+            if (_bannerLayout != null) _bannerLayout.SetBannerHeightPixels(pixels);
+        }
+
+        private void UpdateBannerDesiredState()
+        {
+            if (_ads == null || _adPolicy == null || _save == null) return;
+            bool desired = _screenWantsBanner && _overlayDepth == 0 && !_adBreakActive && _adPolicy.IsBannerEligible(_save.Data);
+            _ads.SetBannerDesired(desired);
+            if (!desired && _bannerLayout != null) _bannerLayout.SetBannerHeightPixels(0f);
+        }
+
+        private void ShowToast(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message) || _contentRoot == null) return;
+            if (_toast != null) Destroy(_toast);
+            _toast = new GameObject("AdStatusToast", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
+            _toast.transform.SetParent(_contentRoot, false);
+            var image = _toast.GetComponent<Image>(); image.color = Color.Lerp(_theme.panel, _theme.background, .25f); image.sprite = RuntimeArt.RoundedSprite(24); image.type = UnityEngine.UI.Image.Type.Sliced; Elevate(image, 5f);
+            var text = Text(_toast.transform, "Message", message, 20, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Stretch(text.rectTransform); text.rectTransform.offsetMin = new Vector2(18f, 8f); text.rectTransform.offsetMax = new Vector2(-18f, -8f);
+            Anchor((RectTransform)_toast.transform, .5f, .22f, 700, 78);
+            _toast.transform.SetAsLastSibling();
+            StartCoroutine(FadeToast(_toast));
+        }
+
+        private IEnumerator FadeToast(GameObject toast)
+        {
+            yield return new WaitForSecondsRealtime(1.8f);
+            if (toast == null) yield break;
+            var group = toast.GetComponent<CanvasGroup>();
+            float elapsed = 0f;
+            while (elapsed < .25f && toast != null)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                group.alpha = 1f - Mathf.Clamp01(elapsed / .25f);
+                yield return null;
+            }
+            if (toast != null) Destroy(toast);
+            if (_toast == toast) _toast = null;
         }
 
         private void AddBackdrop(Transform parent, int chapter)
@@ -719,7 +791,7 @@ namespace MonsterLogic.UI
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(RawImage), typeof(Button)); go.transform.SetParent(parent, false);
             var image = go.GetComponent<RawImage>(); image.texture = texture; image.color = texture == null ? Color.clear : Color.white;
-            var button = go.GetComponent<Button>(); button.targetGraphic = image; button.onClick.AddListener(() => { _audio?.Play("tap"); action?.Invoke(); });
+            var button = go.GetComponent<Button>(); button.targetGraphic = image; button.onClick.AddListener(() => { if (_adBreakActive) return; _audio?.Play("tap"); action?.Invoke(); });
             return (RectTransform)go.transform;
         }
         private Image SpriteImage(Transform parent, string name, Sprite sprite)
@@ -739,7 +811,7 @@ namespace MonsterLogic.UI
         private RectTransform Button(Transform parent, string name, string label, Action action, bool icon = false)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button)); go.transform.SetParent(parent, false); var image = go.GetComponent<Image>(); image.color = icon ? _theme.panel : _theme.accent; image.sprite = RuntimeArt.RoundedSprite(icon ? 30 : 34); image.type = UnityEngine.UI.Image.Type.Sliced; Elevate(image, icon ? 4f : 5f);
-            var button = go.GetComponent<Button>(); button.targetGraphic = image; var colors = button.colors; colors.normalColor = Color.white; colors.pressedColor = new Color(.84f,.84f,.9f); colors.highlightedColor = new Color(.96f,.96f,1f); button.colors = colors; button.onClick.AddListener(() => { _audio?.Play("tap"); action?.Invoke(); });
+            var button = go.GetComponent<Button>(); button.targetGraphic = image; var colors = button.colors; colors.normalColor = Color.white; colors.pressedColor = new Color(.84f,.84f,.9f); colors.highlightedColor = new Color(.96f,.96f,1f); button.colors = colors; button.onClick.AddListener(() => { if (_adBreakActive) return; _audio?.Play("tap"); action?.Invoke(); });
             var text = Text(go.transform, "Label", label, icon ? (label.Length > 1 ? 18 : 44) : 27, icon ? _theme.ink : Color.white, FontStyles.Bold, TextAlignmentOptions.Center); Stretch(text.rectTransform); text.raycastTarget = false; return (RectTransform)go.transform;
         }
         private static void Stretch(RectTransform rect) { rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero; }

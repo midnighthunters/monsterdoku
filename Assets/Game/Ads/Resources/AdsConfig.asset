@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71f1eea2a5f9fe9489d615849131b09a, type: 3}
+  m_Name: AdsConfig
+  m_EditorClassIdentifier: 
+  adsEnabled: 1
+  generalAudienceAdsApproved: 0
+  developmentTestMode: 0
+  androidRewardedAdUnitId: REPLACE_ME_ANDROID_MAX_REWARDED
+  androidInterstitialAdUnitId: REPLACE_ME_ANDROID_MAX_INTERSTITIAL
+  androidBannerAdUnitId: REPLACE_ME_ANDROID_MAX_BANNER
+  iosRewardedAdUnitId: REPLACE_ME_IOS_MAX_REWARDED
+  iosInterstitialAdUnitId: REPLACE_ME_IOS_MAX_INTERSTITIAL
+  iosBannerAdUnitId: REPLACE_ME_IOS_MAX_BANNER
+  bannerUnlockCompletedLevel: 3
+  interstitialStartCompletedLevel: 10
+  interstitialEveryNLevelCompletions: 1
+  privacyPolicyUrl: REPLACE_ME_HTTPS_PRIVACY_POLICY
+  termsOfServiceUrl: REPLACE_ME_HTTPS_TERMS

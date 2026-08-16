@@ -72,9 +72,11 @@ namespace MonsterLogic.Ads
                 Debug.LogWarning("A second MaxAdService was rejected to prevent duplicate MAX callback subscriptions.");
                 return;
             }
-            if (_config == null || !_config.IsRuntimeReady(out string reason))
+            string reason = "AdsConfig is missing.";
+            bool runtimeReady = _config != null && _config.IsRuntimeReady(out reason);
+            if (!runtimeReady)
             {
-                Debug.Log("MAX ads remain disabled: " + (reason ?? "missing AdsConfig"));
+                Debug.Log("MAX ads remain disabled: " + reason);
                 return;
             }
 
