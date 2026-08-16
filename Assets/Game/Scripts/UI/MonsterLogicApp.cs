@@ -164,19 +164,18 @@ namespace MonsterLogic.UI
 
         // The selected villain is a deliberate, single-tap mode. It gives the board
         // the same directness as a physical puzzle piece while preserving tap-to-X.
-        private void BuildGameplayActions(PuzzleLevelData level)
+private void BuildGameplayActions(PuzzleLevelData level)
         {
             var actions = Panel(_screen.transform, "GameplayActions", new Color(0f, 0f, 0f, 0f)); Anchor(actions, .5f, .085f, 650, 165);
             Color villainAccent = VillainAccent(VillainGauntlet.Resolve(level.displayNumber));
-            var place = BuildActionOrb(actions, "PlaceVillain", villainAccent, "PLACE\nVILLAIN", TogglePlaceMode);
-            Anchor(place, .25f, .5f, 154, 154);
-            _placeActionRing = place.GetComponent<Image>();
-            _placeActionArt = SpriteImage(place, "VillainArt", _activeVillainSprite); Anchor(_placeActionArt.rectTransform, .5f, .58f, 92, 92);
+            var reveal = BuildActionOrb(actions, "RevealVillain", villainAccent, "REVEAL\nVILLAIN", RevealRandomVillain);
+            Anchor(reveal, .25f, .5f, 154, 154);
+            var villainArt = SpriteImage(reveal, "VillainArt", _activeVillainSprite); Anchor(villainArt.rectTransform, .5f, .58f, 92, 92);
             if (_activeVillainSprite == null)
             {
-                var fallback = DisplayText(place, "VillainFallback", "◆", 56, Color.white, TextAlignmentOptions.Center); Anchor(fallback.rectTransform, .5f, .58f, 92, 92);
+                var fallback = DisplayText(reveal, "VillainFallback", "◆", 56, Color.white, TextAlignmentOptions.Center); Anchor(fallback.rectTransform, .5f, .58f, 92, 92);
             }
-            _placeActionLabel = Text(place, "ActionLabel", "PLACE\nVILLAIN", 17, Color.white, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(_placeActionLabel.rectTransform, .5f, .15f, 136, 42);
+            var revealLabel = Text(reveal, "ActionLabel", "REVEAL\nVILLAIN", 17, Color.white, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(revealLabel.rectTransform, .5f, .15f, 136, 42);
 
             var hint = BuildActionOrb(actions, "Hint", Color.Lerp(_theme.success, _theme.accent, .35f), "HINT", ShowHint);
             Anchor(hint, .75f, .5f, 154, 154);
@@ -282,28 +281,45 @@ namespace MonsterLogic.UI
             void Edge(string name, float ax, float ay, float sx, float sy) { var img = Image(parent, name, edge); img.raycastTarget = false; Anchor(img.rectTransform, ax, ay, sx, sy); }
         }
 
-        private void OnCellActivated(int cell, bool monsterAction)
+private void OnCellActivated(int cell, bool monsterAction)
         {
-            if (_hideInitialClueVisuals)
-            {
-                _hideInitialClueVisuals = false;
-                RefreshBoard();
-            }
+            if (_session == null) return;
 
-            bool placeVillain = _placeMode || monsterAction;
-            if (_save.Data.settings.accessibilityCycle && !_placeMode) _session.Cycle(cell); else if (placeVillain) _session.ToggleMonster(cell); else _session.ToggleNote(cell);
-            _audio.Play(placeVillain ? "monster" : "x");
-            if (_placeMode) SetPlaceMode(false);
+            if (_save.Data.settings.accessibilityCycle && !monsterAction) _session.Cycle(cell);
+            else if (monsterAction) _session.ToggleMonster(cell);
+            else _session.ToggleNote(cell);
+
+            _audio.Play(monsterAction ? "monster" : "x");
             if (_session.Hearts <= 0) ShowOutOfHearts();
         }
 
-        private void RefreshBoard()
+private void RevealRandomVillain()
+        {
+            if (_session == null || _session.IsComplete || _session.Hearts <= 0) return;
+            int[] candidates = Enumerable.Range(0, _session.Monsters.Length)
+                .Where(cell => !_session.Monsters[cell] && _session.Level.IsSolutionCell(cell))
+                .ToArray();
+            if (candidates.Length == 0)
+            {
+                if (_hintText != null) _hintText.text = "Every villain location is already revealed.";
+                return;
+            }
+
+            int cell = candidates[UnityEngine.Random.Range(0, candidates.Length)];
+            _session.ToggleMonster(cell);
+            if (_hintText != null) _hintText.text = "A random villain location has been revealed.";
+            if (cell >= 0 && cell < _cells.Count) StartCoroutine(Highlight(_cells[cell].Background));
+            _haptics.Light();
+        }
+
+
+private void RefreshBoard()
         {
             if (_session == null || _cells.Count == 0) return; int n = _session.Level.gridSize;
             for (int i = 0; i < _cells.Count; i++)
             {
                 var view = _cells[i]; var mark = _session.GetMark(i); view.Mark.text = ""; view.Mark.fontSize = view.BaseFontSize; view.Monster.enabled = false; view.LockBadge.enabled = false; view.RegionSymbol.enabled = _save.Data.settings.regionSymbols;
-                if (_hideInitialClueVisuals && (mark == CellMark.LockedMonster || mark == CellMark.AutomaticX)) continue;
+                if (_hideInitialClueVisuals && mark == CellMark.LockedMonster) continue;
                 if (mark == CellMark.PlayerX) { view.Mark.text = "X"; view.Mark.color = _theme.ink; }
                 else if (mark == CellMark.AutomaticX) { view.Mark.text = "X"; view.Mark.color = _save.Data.settings.automaticNotesIdentical ? _theme.ink : Color.Lerp(_theme.muted, view.Background.color, .25f); view.Mark.fontSize *= .88f; }
                 else if (mark == CellMark.Monster || mark == CellMark.LockedMonster)
@@ -314,8 +330,9 @@ namespace MonsterLogic.UI
                     view.LockBadge.enabled = mark == CellMark.LockedMonster;
                 }
             }
-            int visibleMonsterCount = _hideInitialClueVisuals ? 0 : _session.Monsters.Count(x => x);
-            _progress.text = $"{visibleMonsterCount}/{n}  MONSTERS"; _hearts.text = $"HEARTS  {_session.Hearts}";
+            int hiddenLocks = _hideInitialClueVisuals ? (_session.Level.lockedMonsterCells?.Length ?? 0) : 0;
+            int visibleMonsterCount = _session.Monsters.Where((monster, cell) => monster && (!_hideInitialClueVisuals || !_session.Level.IsLocked(cell))).Count();
+            _progress.text = $"{visibleMonsterCount}/{n - hiddenLocks}  MONSTERS"; _hearts.text = $"HEARTS  {_session.Hearts}";
         }
 
         private void OnSessionChanged() { RefreshBoard(); PersistSession(); }

@@ -174,18 +174,10 @@ namespace MonsterLogic.Puzzle
 
         private void PushSnapshot() => _history.Push(new Snapshot { monsters = (bool[])Monsters.Clone(), playerNotes = (bool[])PlayerNotes.Clone(), hearts = Hearts, mistakes = Mistakes });
 
-        private void RebuildAutomaticNotes()
+private void RebuildAutomaticNotes()
         {
-            Array.Clear(AutomaticNoteSources, 0, AutomaticNoteSources.Length); int n = Level.gridSize;
-            for (int cell = 0; cell < Monsters.Length; cell++) if (Monsters[cell])
-            {
-                int r = cell / n, c = cell % n, g = Level.regionIdByCell[cell];
-                for (int i = 0; i < n; i++) { Add(r * n + i, cell); Add(i * n + c, cell); }
-                for (int i = 0; i < n * n; i++) if (Level.regionIdByCell[i] == g) Add(i, cell);
-                for (int dr = -1; dr <= 1; dr++) for (int dc = -1; dc <= 1; dc++)
-                { int rr = r + dr, cc = c + dc; if (rr >= 0 && rr < n && cc >= 0 && cc < n) Add(rr * n + cc, cell); }
-            }
-            void Add(int target, int source) { if (target != source && !Monsters[target]) AutomaticNoteSources[target]++; }
+            // Board input must affect only its selected tile; derived cross marks are disabled.
+            Array.Clear(AutomaticNoteSources, 0, AutomaticNoteSources.Length);
         }
     }
 }
