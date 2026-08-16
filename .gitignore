@@ -1,0 +1,10 @@
+# Ignore everything by default
+*
+
+# Keep this ignore file tracked
+!.gitignore
+
+# Keep Assets/Game and everything inside it
+!Assets/
+!Assets/Game/
+!Assets/Game/**
