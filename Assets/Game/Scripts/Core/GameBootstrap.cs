@@ -1,3 +1,4 @@
+using MonsterLogic.Ads;
 using MonsterLogic.Puzzle;
 using MonsterLogic.Services;
 using MonsterLogic.UI;
@@ -28,8 +29,26 @@ namespace MonsterLogic.Core
             }
             database.MigrateIfNeeded();
             var save = new SaveService();
+            var adsConfig = Resources.Load<AdsConfig>("AdsConfig");
+            var adPolicy = AdPolicy.FromConfig(adsConfig);
+            IAdService ads = new NoOpAdService();
+#if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR
+            string adsDisabledReason = "AdsConfig is missing.";
+            bool adsReady = adsConfig != null && adsConfig.IsRuntimeReady(out adsDisabledReason);
+            if (adsReady)
+            {
+                var maxAds = gameObject.AddComponent<MaxAdService>();
+                maxAds.Configure(adsConfig, adPolicy);
+                ads = maxAds;
+            }
+            else
+            {
+                Debug.Log("MAX ads remain disabled: " + adsDisabledReason);
+            }
+#endif
             var app = gameObject.AddComponent<MonsterLogicApp>();
-            app.Initialize(database, save, new NoOpAdService(), displayFont, bodyFont);
+            app.Initialize(database, save, ads, adPolicy, displayFont, bodyFont);
+            ads.Initialize();
         }
     }
 }

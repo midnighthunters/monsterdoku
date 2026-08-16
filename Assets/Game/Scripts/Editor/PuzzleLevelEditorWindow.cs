@@ -62,7 +62,6 @@ namespace MonsterLogic.EditorTools
             }
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Toggle starter at solution row 0")) ToggleStarter();
                 if (GUILayout.Button("Recalculate difficulty")) RecalculateDifficulty();
                 if (GUILayout.Button("Play selected")) PlaySelected();
             }
@@ -88,18 +87,14 @@ namespace MonsterLogic.EditorTools
             for (int r = 0; r < n; r++) for (int c = 0; c < n; c++)
             {
                 int cell = r * n + c, region = level.regionIdByCell[cell]; Rect rect = new Rect(board.x + c * size, board.y + r * size, size - 2, size - 2);
-                EditorGUI.DrawRect(rect, colors[region % colors.Length]); GUI.Label(rect, level.solutionColumnByRow[r] == c ? (level.IsLocked(cell) ? "◆" : "●") : region.ToString(), new GUIStyle(EditorStyles.centeredGreyMiniLabel) { fontStyle = level.solutionColumnByRow[r] == c ? FontStyle.Bold : FontStyle.Normal });
+                EditorGUI.DrawRect(rect, colors[region % colors.Length]); GUI.Label(rect, level.solutionColumnByRow[r] == c ? "●" : region.ToString(), new GUIStyle(EditorStyles.centeredGreyMiniLabel) { fontStyle = level.solutionColumnByRow[r] == c ? FontStyle.Bold : FontStyle.Normal });
             }
-            EditorGUILayout.LabelField("● canonical monster   ◆ locked starter   number = region ID"); EditorGUILayout.EndScrollView();
+            EditorGUILayout.LabelField("● canonical villain   number = region ID"); EditorGUILayout.EndScrollView();
         }
 
         private void RegenerateSelected()
         {
             var old = Current; _database.levels[_selected] = PuzzleGenerator.Generate(old.displayNumber, old.chapterId, old.gridSize, old.generationSeed); SaveDatabase(); _status = "Regenerated deterministically from stored seed.";
-        }
-        private void ToggleStarter()
-        {
-            var level = Current; int cell = level.solutionColumnByRow[0]; var list = (level.lockedMonsterCells ?? Array.Empty<int>()).ToList(); if (list.Contains(cell)) list.Remove(cell); else list.Add(cell); level.lockedMonsterCells = list.ToArray(); SaveDatabase(); _status = PuzzleValidator.Validate(level).ToString();
         }
         private void RecalculateDifficulty()
         {

@@ -10,9 +10,9 @@ namespace MonsterLogic.UI
     {
         public int CellIndex { get; private set; }
         public Image Background { get; private set; }
+        public Image EmptyIcon { get; private set; }
         public TMP_Text Mark { get; private set; }
         public Image Monster { get; private set; }
-        public TMP_Text LockBadge { get; private set; }
         public TMP_Text RegionSymbol { get; private set; }
         public float BaseFontSize { get; private set; }
         public System.Action<int, bool> Activated;
@@ -22,8 +22,8 @@ namespace MonsterLogic.UI
         private float _pressedAt;
         private bool _longPressFired;
 
-        public void Configure(int index, Image background, TMP_Text mark, Image monster, TMP_Text lockBadge, TMP_Text regionSymbol)
-        { CellIndex = index; Background = background; Mark = mark; Monster = monster; LockBadge = lockBadge; RegionSymbol = regionSymbol; BaseFontSize = mark.fontSize; }
+        public void Configure(int index, Image background, Image emptyIcon, TMP_Text mark, Image monster, TMP_Text regionSymbol)
+        { CellIndex = index; Background = background; EmptyIcon = emptyIcon; Mark = mark; Monster = monster; RegionSymbol = regionSymbol; BaseFontSize = mark.fontSize; }
 
         public void OnPointerDown(PointerEventData eventData) { _pressedAt = Time.unscaledTime; _longPressFired = false; }
         public void OnPointerUp(PointerEventData eventData)

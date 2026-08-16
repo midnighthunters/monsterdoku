@@ -15,7 +15,6 @@ namespace MonsterLogic.Puzzle
         public int gridSize;
         public int[] regionIdByCell;
         public int[] solutionColumnByRow;
-        public int[] lockedMonsterCells;
         public string characterTheme;
         public string backgroundTheme;
         public DifficultyTier difficultyTier;
@@ -28,7 +27,6 @@ namespace MonsterLogic.Puzzle
         public int Cell(int row, int column) => row * gridSize + column;
         public int Region(int row, int column) => regionIdByCell[Cell(row, column)];
         public bool IsSolutionCell(int cell) => solutionColumnByRow[cell / gridSize] == cell % gridSize;
-        public bool IsLocked(int cell) => Array.IndexOf(lockedMonsterCells ?? Array.Empty<int>(), cell) >= 0;
     }
 
     [Serializable]

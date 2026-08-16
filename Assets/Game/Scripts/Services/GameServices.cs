@@ -15,7 +15,7 @@ namespace MonsterLogic.Services
     }
     [Serializable] public sealed class SaveData
     {
-        public int schemaVersion = 3; public int highestUnlocked = 1; public List<LevelResult> completed = new List<LevelResult>();
+        public int schemaVersion = 4; public bool playerPrefsLinked; public int highestUnlocked = 1; public List<LevelResult> completed = new List<LevelResult>();
         public string currentLevelId = "campaign-001"; public bool tutorialComplete; public SettingsData settings = new SettingsData();
         public int[] inProgressMonsters = Array.Empty<int>(); public int[] inProgressPlayerNotes = Array.Empty<int>();
         public int inProgressHearts = 3; public int inProgressMistakes; public float inProgressSeconds;
@@ -24,11 +24,30 @@ namespace MonsterLogic.Services
 
     public sealed class SaveService
     {
-        private readonly string _path = Path.Combine(Application.persistentDataPath, "monster-logic-save.json");
+        private const string DefaultPrefsMarkerKey = "MonsterLogic.SaveDataLinked";
+        private readonly string _path;
+        private readonly string _prefsMarkerKey;
+        private SaveData _data;
         private string BackupPath => _path + ".bak";
-        public SaveData Data { get; private set; }
+        private string TempPath => _path + ".tmp";
+        public SaveData Data { get { SynchronizeWithPlayerPrefs(); return _data; } private set => _data = value; }
 
-        public SaveService() => Data = Load();
+        public SaveService(string pathOverride = null, string prefsMarkerKeyOverride = null)
+        {
+            _path = string.IsNullOrWhiteSpace(pathOverride) ? Path.Combine(Application.persistentDataPath, "monster-logic-save.json") : pathOverride;
+            _prefsMarkerKey = string.IsNullOrWhiteSpace(prefsMarkerKeyOverride) ? DefaultPrefsMarkerKey : prefsMarkerKeyOverride;
+            bool hadSaveFiles = File.Exists(_path) || File.Exists(BackupPath);
+            Data = Load();
+
+            // Existing schema-3 saves have no link flag, so adopt them once without
+            // deleting progress. Once linked, a missing marker means PlayerPrefs was
+            // cleared and the JSON save must be reset as part of the same operation.
+            if (hadSaveFiles && Data.playerPrefsLinked && !PlayerPrefs.HasKey(_prefsMarkerKey)) ResetSaveData();
+            Data.playerPrefsLinked = true;
+            Data.schemaVersion = 4;
+            EnsurePrefsMarker();
+            WriteToDisk();
+        }
 
         public void RecordCompletion(PuzzleLevelData level, float seconds, int mistakes)
         {
@@ -44,13 +63,12 @@ namespace MonsterLogic.Services
         {
             if (session == null || session.IsComplete) return;
             Data.currentLevelId = session.Level.levelId;
-            Data.inProgressMonsters = session.Monsters.Select((placed, cell) => (placed, cell)).Where(x => x.placed && !session.Level.IsLocked(x.cell)).Select(x => x.cell).ToArray();
+            Data.inProgressMonsters = session.Monsters.Select((placed, cell) => (placed, cell)).Where(x => x.placed).Select(x => x.cell).ToArray();
             Data.inProgressPlayerNotes = session.PlayerNotes.Select((placed, cell) => (placed, cell)).Where(x => x.placed).Select(x => x.cell).ToArray();
             Data.inProgressHearts = session.Hearts; Data.inProgressMistakes = session.Mistakes; Data.inProgressSeconds = session.ElapsedSeconds; Save();
         }
 
-        // A timer alone does not represent player progress. Treat it as a fresh board so
-        // interrupted, untouched levels do not restore their authored clue visuals.
+        // A timer alone does not represent player progress. Treat it as a fresh board.
         public bool HasSessionFor(PuzzleLevelData level) => level != null && Data.currentLevelId == level.levelId &&
             ((Data.inProgressMonsters?.Length ?? 0) > 0 || (Data.inProgressPlayerNotes?.Length ?? 0) > 0 || Data.inProgressMistakes > 0);
 
@@ -71,12 +89,50 @@ namespace MonsterLogic.Services
 
         public void Save()
         {
+            SynchronizeWithPlayerPrefs();
+            WriteToDisk();
+        }
+
+        private void SynchronizeWithPlayerPrefs()
+        {
+            if (_data == null || !_data.playerPrefsLinked || PlayerPrefs.HasKey(_prefsMarkerKey)) return;
+            ResetSaveData();
+            EnsurePrefsMarker();
+            WriteToDisk();
+        }
+
+        private void ResetSaveData()
+        {
+            DeleteSaveFiles();
+            _data = new SaveData { schemaVersion = 4, playerPrefsLinked = true };
+        }
+
+        private void EnsurePrefsMarker()
+        {
+            if (PlayerPrefs.HasKey(_prefsMarkerKey)) return;
+            PlayerPrefs.SetInt(_prefsMarkerKey, 1);
+            PlayerPrefs.Save();
+        }
+
+        private void DeleteSaveFiles()
+        {
             try
             {
-                string json = JsonUtility.ToJson(Data, true), temp = _path + ".tmp";
-                File.WriteAllText(temp, json);
+                if (File.Exists(_path)) File.Delete(_path);
+                if (File.Exists(BackupPath)) File.Delete(BackupPath);
+                if (File.Exists(TempPath)) File.Delete(TempPath);
+            }
+            catch (Exception ex) { Debug.LogWarning($"Save reset could not remove every file: {ex.Message}"); }
+        }
+
+        private void WriteToDisk()
+        {
+            try
+            {
+                string json = JsonUtility.ToJson(_data, true);
+                File.WriteAllText(TempPath, json);
                 if (File.Exists(_path)) File.Copy(_path, BackupPath, true);
-                File.Copy(temp, _path, true); File.Delete(temp);
+                File.Copy(TempPath, _path, true); File.Delete(TempPath);
             }
             catch (Exception ex) { Debug.LogWarning($"Save failed safely: {ex.Message}"); }
         }
@@ -90,25 +146,76 @@ namespace MonsterLogic.Services
             }
             var data = Try(_path) ?? Try(BackupPath) ?? new SaveData();
             data.settings ??= new SettingsData(); data.completed ??= new List<LevelResult>(); data.highestUnlocked = Mathf.Clamp(data.highestUnlocked, 1, 250);
-            data.inProgressMonsters ??= Array.Empty<int>(); data.inProgressPlayerNotes ??= Array.Empty<int>(); data.acknowledgedVillainTiers ??= new List<string>(); data.schemaVersion = 3;
+            data.inProgressMonsters ??= Array.Empty<int>(); data.inProgressPlayerNotes ??= Array.Empty<int>(); data.acknowledgedVillainTiers ??= new List<string>(); data.schemaVersion = 4;
             return data;
+        }
+    }
+
+    public enum RewardPlacement { ExtraHeart, Hint, RevealVillain }
+    public enum RewardedAdResult { Earned, DismissedWithoutReward, NotReady, DisplayFailed }
+    public enum InterstitialAdResult { DisplayedAndClosed, NotReady, DisplayFailed, Ineligible }
+
+    [Serializable]
+    public readonly struct AdRevenueEvent
+    {
+        public readonly string format;
+        public readonly string placement;
+        public readonly string networkName;
+        public readonly double revenue;
+        public readonly string revenuePrecision;
+
+        public AdRevenueEvent(string format, string placement, string networkName, double revenue, string revenuePrecision)
+        {
+            this.format = format;
+            this.placement = placement;
+            this.networkName = networkName;
+            this.revenue = revenue;
+            this.revenuePrecision = revenuePrecision;
         }
     }
 
     public interface IAdService
     {
+        event Action RewardedAvailabilityChanged;
+        event Action<bool> FullscreenAdStateChanged;
+        event Action<float> BannerHeightChanged;
+        event Action FullscreenAdWillPresent;
+        event Action<AdRevenueEvent> RevenuePaid;
+
+        bool IsInitialized { get; }
         bool IsRewardedReady { get; }
-        void ShowRewardedHint(Action<bool> completed);
-        void ShowRewardedRevive(Action<bool> completed);
-        void ShowPostLevelInterstitialIfAllowed(int completedLevel);
+        bool IsFullscreenAdShowing { get; }
+        bool CanShowPrivacyOptions { get; }
+
+        void Initialize();
+        void ShowRewarded(RewardPlacement placement, Action<RewardedAdResult> completed);
+        void ShowPostLevelInterstitialIfAllowed(int completedLevel, long completionToken, Action<InterstitialAdResult> completed);
+        void SetBannerDesired(bool desired);
+        void ShowPrivacyOptions(Action<bool> completed);
+        void Shutdown();
     }
 
     public sealed class NoOpAdService : IAdService
     {
+#pragma warning disable 0067
+        public event Action RewardedAvailabilityChanged;
+        public event Action<bool> FullscreenAdStateChanged;
+        public event Action<float> BannerHeightChanged;
+        public event Action FullscreenAdWillPresent;
+        public event Action<AdRevenueEvent> RevenuePaid;
+#pragma warning restore 0067
+
+        public bool IsInitialized => false;
         public bool IsRewardedReady => false;
-        public void ShowRewardedHint(Action<bool> completed) => completed?.Invoke(false);
-        public void ShowRewardedRevive(Action<bool> completed) => completed?.Invoke(false);
-        public void ShowPostLevelInterstitialIfAllowed(int completedLevel) { }
+        public bool IsFullscreenAdShowing => false;
+        public bool CanShowPrivacyOptions => false;
+        public void Initialize() { }
+        public void ShowRewarded(RewardPlacement placement, Action<RewardedAdResult> completed) => completed?.Invoke(RewardedAdResult.NotReady);
+        public void ShowPostLevelInterstitialIfAllowed(int completedLevel, long completionToken, Action<InterstitialAdResult> completed) =>
+            completed?.Invoke(completedLevel < 10 ? InterstitialAdResult.Ineligible : InterstitialAdResult.NotReady);
+        public void SetBannerDesired(bool desired) { }
+        public void ShowPrivacyOptions(Action<bool> completed) => completed?.Invoke(false);
+        public void Shutdown() { }
     }
 
     public sealed class HapticService

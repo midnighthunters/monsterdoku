@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace MonsterLogic.Puzzle
 {
-    public enum CellMark { Empty, PlayerX, AutomaticX, Monster, LockedMonster }
+    public enum CellMark { Empty, PlayerX, AutomaticX, Monster }
 
     public sealed class PuzzleSession
     {
@@ -12,8 +12,6 @@ namespace MonsterLogic.Puzzle
         {
             public bool[] monsters;
             public bool[] playerNotes;
-            public int hearts;
-            public int mistakes;
         }
 
         public PuzzleLevelData Level { get; private set; }
@@ -38,7 +36,6 @@ namespace MonsterLogic.Puzzle
             Level = level ?? throw new ArgumentNullException(nameof(level));
             int count = level.gridSize * level.gridSize;
             Monsters = new bool[count]; PlayerNotes = new bool[count]; AutomaticNoteSources = new int[count];
-            foreach (int cell in level.lockedMonsterCells ?? Array.Empty<int>()) Monsters[cell] = true;
             Hearts = 3; Mistakes = 0; IsComplete = false; ElapsedSeconds = 0; _hintStage = 0; _history.Clear();
             RebuildAutomaticNotes(); Changed?.Invoke();
         }
@@ -48,7 +45,6 @@ namespace MonsterLogic.Puzzle
             if (Level == null) return false;
             int count = Level.gridSize * Level.gridSize;
             var restoredMonsters = new bool[count];
-            foreach (int cell in Level.lockedMonsterCells ?? Array.Empty<int>()) restoredMonsters[cell] = true;
             foreach (int cell in monsterCells ?? Enumerable.Empty<int>())
                 if (cell >= 0 && cell < count && Level.IsSolutionCell(cell)) restoredMonsters[cell] = true;
 
@@ -64,7 +60,7 @@ namespace MonsterLogic.Puzzle
 
         public CellMark GetMark(int cell)
         {
-            if (Monsters[cell]) return Level.IsLocked(cell) ? CellMark.LockedMonster : CellMark.Monster;
+            if (Monsters[cell]) return CellMark.Monster;
             if (PlayerNotes[cell]) return CellMark.PlayerX;
             return AutomaticNoteSources[cell] > 0 ? CellMark.AutomaticX : CellMark.Empty;
         }
@@ -104,8 +100,18 @@ namespace MonsterLogic.Puzzle
         public bool Undo()
         {
             if (_history.Count == 0) return false;
-            var s = _history.Pop(); Monsters = s.monsters; PlayerNotes = s.playerNotes; Hearts = s.hearts; Mistakes = s.mistakes;
+            var s = _history.Pop(); Monsters = s.monsters; PlayerNotes = s.playerNotes;
             IsComplete = false; RebuildAutomaticNotes(); Changed?.Invoke(); return true;
+        }
+
+        public bool GrantHeart(int amount = 1)
+        {
+            if (Level == null || IsComplete || amount <= 0 || Hearts >= 3) return false;
+            int previous = Hearts;
+            Hearts = Math.Min(3, Hearts + amount);
+            if (Hearts == previous) return false;
+            Changed?.Invoke();
+            return true;
         }
 
         public void Restart() => Start(Level);
@@ -170,9 +176,9 @@ namespace MonsterLogic.Puzzle
             return PuzzleSolver.CountSolutions(Level, 1, required) > 0;
         }
 
-        private bool CanEdit(int cell) => cell >= 0 && cell < Monsters.Length && !IsComplete && Hearts > 0 && !Level.IsLocked(cell);
+        private bool CanEdit(int cell) => cell >= 0 && cell < Monsters.Length && !IsComplete && Hearts > 0;
 
-        private void PushSnapshot() => _history.Push(new Snapshot { monsters = (bool[])Monsters.Clone(), playerNotes = (bool[])PlayerNotes.Clone(), hearts = Hearts, mistakes = Mistakes });
+        private void PushSnapshot() => _history.Push(new Snapshot { monsters = (bool[])Monsters.Clone(), playerNotes = (bool[])PlayerNotes.Clone() });
 
 private void RebuildAutomaticNotes()
         {

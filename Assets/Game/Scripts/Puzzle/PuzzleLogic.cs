@@ -74,9 +74,8 @@ namespace MonsterLogic.Puzzle
         {
             int n = level.gridSize, count = 0;
             var usedColumns = new bool[n]; var usedRegions = new bool[n]; var permutation = new int[n];
-            var lockedRows = new int[n]; for (int i = 0; i < n; i++) lockedRows[i] = -1;
-            foreach (int cell in level.lockedMonsterCells ?? Array.Empty<int>()) lockedRows[cell / n] = cell % n;
-            foreach (int cell in requiredCells ?? Array.Empty<int>()) lockedRows[cell / n] = cell % n;
+            var requiredColumnByRow = new int[n]; for (int i = 0; i < n; i++) requiredColumnByRow[i] = -1;
+            foreach (int cell in requiredCells ?? Array.Empty<int>()) requiredColumnByRow[cell / n] = cell % n;
             Search(0);
             return count;
 
@@ -84,8 +83,8 @@ namespace MonsterLogic.Puzzle
             {
                 if (count >= earlyExit) return;
                 if (row == n) { count++; output?.Add((int[])permutation.Clone()); return; }
-                int start = lockedRows[row] >= 0 ? lockedRows[row] : 0;
-                int end = lockedRows[row] >= 0 ? start + 1 : n;
+                int start = requiredColumnByRow[row] >= 0 ? requiredColumnByRow[row] : 0;
+                int end = requiredColumnByRow[row] >= 0 ? start + 1 : n;
                 for (int column = start; column < end; column++)
                 {
                     int region = level.Region(row, column);
@@ -111,7 +110,6 @@ namespace MonsterLogic.Puzzle
         {
             int n = level.gridSize;
             var placed = new bool[n * n]; var excluded = new bool[n * n];
-            foreach (int locked in level.lockedMonsterCells ?? Array.Empty<int>()) placed[locked] = true;
             int steps = 0, contradictionSteps = 0;
             while (placed.Count(x => x) < n && steps < n * n * 2)
             {
@@ -126,7 +124,7 @@ namespace MonsterLogic.Puzzle
                 excluded[eliminated] = true; steps++; contradictionSteps++; AddTechnique("Controlled contradiction");
             }
             report.deductionSteps = steps;
-            report.difficultyScore = n * 10 + steps * 2 + contradictionSteps * 8 - (level.lockedMonsterCells?.Length ?? 0) * 7;
+            report.difficultyScore = n * 10 + steps * 2 + contradictionSteps * 8;
             if (placed.Count(x => x) != n) report.errors.Add("Human-style analyser did not complete the puzzle.");
 
             void ApplyDirectEliminations()
@@ -181,7 +179,6 @@ namespace MonsterLogic.Puzzle
             if (ids.Length != n || !ids.SequenceEqual(Enumerable.Range(0, n))) report.errors.Add("Region IDs must be contiguous and total N.");
             for (int g = 0; g < n; g++) if (!PuzzleRules.IsRegionConnected(level, g)) report.errors.Add($"Region {g} is disconnected.");
             if (!PuzzleRules.IsCanonicalSolutionValid(level)) report.errors.Add("Canonical solution violates a core rule.");
-            foreach (int cell in level.lockedMonsterCells ?? Array.Empty<int>()) if (cell < 0 || cell >= n * n || !level.IsSolutionCell(cell)) report.errors.Add($"Locked cell {cell} is not canonical.");
             report.solutionCount = PuzzleSolver.CountSolutions(level, 2);
             if (report.solutionCount != 1) report.errors.Add($"Expected one solution, found {report.solutionCount}{(report.solutionCount == 2 ? "+" : "")}.");
             if (report.errors.Count == 0) DifficultyAnalyser.Analyse(level, report);
@@ -223,13 +220,10 @@ namespace MonsterLogic.Puzzle
             var validPermutations = EnumerateValidPermutations(n);
             int[] solution = validPermutations[rng.Next(validPermutations.Count)];
             int[] regions = GrowUniqueRegions(n, solution, rng, validPermutations);
-            int lockedCount = LockedCount(number, chapter); var locked = new List<int>();
-            var rows = Enumerable.Range(0, n).OrderBy(_ => rng.Next()).Take(lockedCount);
-            foreach (int row in rows) locked.Add(row * n + solution[row]);
             var level = new PuzzleLevelData
             {
                 levelId = $"campaign-{number:000}", chapterId = chapter, displayNumber = number, gridSize = n,
-                regionIdByCell = regions, solutionColumnByRow = solution, lockedMonsterCells = locked.ToArray(),
+                regionIdByCell = regions, solutionColumnByRow = solution,
                 characterTheme = Characters[(chapter - 1) % Characters.Length], backgroundTheme = Themes[chapter - 1],
                 difficultyTier = chapter <= 1 ? DifficultyTier.Tutorial : chapter <= 3 ? DifficultyTier.Easy : chapter <= 6 ? DifficultyTier.Medium : chapter <= 8 ? DifficultyTier.Hard : DifficultyTier.Expert,
                 generationSeed = seed, parTimeSeconds = chapter <= 2 ? 90 : chapter <= 4 ? 150 : chapter <= 6 ? 210 : chapter <= 8 ? 300 : 420,
@@ -240,17 +234,6 @@ namespace MonsterLogic.Puzzle
             level.difficultyScore = Math.Max(1, report.difficultyScore + chapter * 8 + cadence);
             level.expectedTechniques = report.techniques.Count > 0 ? report.techniques.ToArray() : new[] { "Direct elimination" };
             return level;
-        }
-
-        private static int LockedCount(int number, int chapter)
-        {
-            if (number <= 3) return 2;
-            if (number <= 10) return 2;
-            if (chapter == 1) return number < 18 ? 2 : 1;
-            if (chapter == 2 || chapter == 4 || chapter == 7) return 1;
-            if (chapter == 3 || chapter == 5) return number % 2 == 0 ? 2 : 1;
-            if (chapter == 6 || chapter == 8 || chapter == 9) return number % 2;
-            return 0;
         }
 
         private static List<int[]> EnumerateValidPermutations(int n)
