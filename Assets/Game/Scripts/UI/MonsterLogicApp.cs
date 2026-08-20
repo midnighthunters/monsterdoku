@@ -190,7 +190,7 @@ namespace MonsterLogic.UI
 
         public void StartLevel(int number)
         {
-            var level = _database.GetByNumber(Mathf.Clamp(number, 1, 250)); if (level == null) return;
+            var level = _database.GetByNumber(Mathf.Clamp(number, 1, Mathf.Max(1, _database.levels.Count))); if (level == null) return;
             _activeVillainSprite = VillainSprite(VillainGauntlet.Resolve(level.displayNumber));
             _activeCrossSprite = _crossSprites.Length == 0 ? null : _crossSprites[(level.displayNumber - 1) % _crossSprites.Length];
             bool restoringSession = _save.HasSessionFor(level);
@@ -216,9 +216,9 @@ namespace MonsterLogic.UI
 
             var rules = Container(_screen.transform, "Rules"); Anchor(rules, .5f, .755f, 800, 94);
             var ruleLayout = rules.gameObject.AddComponent<HorizontalLayoutGroup>(); ruleLayout.spacing = 14; ruleLayout.childForceExpandWidth = true; ruleLayout.childForceExpandHeight = true;
-            Rule(rules, RuntimeIcon.Region, "1 per region"); Rule(rules, RuntimeIcon.Grid, "1 per row\n+ column"); Rule(rules, RuntimeIcon.Ghost, "No touching");
+            Rule(rules, "text1", "1 per region"); Rule(rules, "text2", "1 per row\n+ column"); Rule(rules, "text3", "No touching");
 
-            float boardSize = level.gridSize == 8 ? 770 : 740;
+            float boardSize = BoardSizeFor(level.gridSize);
             var boardFrame = Image(_screen.transform, "BoardFrame", new Color(1f, 1f, 1f, .16f)); boardFrame.sprite = RuntimeArt.RoundedSprite(30); boardFrame.type = UnityEngine.UI.Image.Type.Sliced; boardFrame.raycastTarget = false; Anchor(boardFrame.rectTransform, .5f, .47f, boardSize + 44, boardSize + 44);
             BuildBoard(level);
             BuildGameplayActions(level);
@@ -227,9 +227,11 @@ namespace MonsterLogic.UI
             RefreshBoard(); StartCoroutine(PlayLevelEntrance(level.displayNumber));
         }
 
+        private static float BoardSizeFor(int gridSize) => Mathf.Clamp(740f + Mathf.Max(0, gridSize - 6) * 8f, 720f, 780f);
+
         private void BuildBoard(PuzzleLevelData level)
         {
-            _cells.Clear(); int n = level.gridSize; float boardSize = n == 8 ? 770 : 740;
+            _cells.Clear(); int n = level.gridSize; float boardSize = BoardSizeFor(n);
             var board = Container(_screen.transform, "Board"); Anchor(board, .5f, .47f, boardSize, boardSize);
             const float cellGap = 7f;
             float cellSize = (boardSize - cellGap * (n - 1)) / n;
@@ -804,11 +806,13 @@ private IEnumerator PlayLevelEntrance(int levelNumber)
             for (int i = 0; i < 9; i++) { var star = Text(parent, "Star", "*", 20 + i % 3 * 8, new Color(_theme.accent.r, _theme.accent.g, _theme.accent.b, .10f), FontStyles.Normal, TextAlignmentOptions.Center); Anchor(star.rectTransform, .08f + (i * .113f) % .84f, .12f + (i * .197f) % .78f, 40, 40); star.raycastTarget = false; }
         }
 
-        private void Rule(Transform parent, RuntimeIcon symbol, string value)
+private void Rule(Transform parent, string spriteName, string value)
         {
             var panel = GamePanel(parent, "Rule", Color.white);
-            var icon = Icon(panel, "Icon", symbol, new Color32(112, 79, 177, 255)); Anchor(icon.rectTransform, .19f, .5f, 44, 44);
-            var text = Text(panel, "Text", value, 20, new Color32(48, 37, 89, 255), FontStyles.Bold, TextAlignmentOptions.Left); Anchor(text.rectTransform, .62f, .5f, 180, 58);
+            var image = panel.GetComponent<Image>();
+            image.sprite = PanelSprite(spriteName) ?? image.sprite;
+            var text = Text(panel, "Text", value, 20, new Color32(48, 37, 89, 255), FontStyles.Bold, TextAlignmentOptions.Left);
+            Anchor(text.rectTransform, .62f, .5f, 180, 58);
         }
 
         private void AddGameBackdrop(Transform parent)
@@ -822,6 +826,7 @@ private IEnumerator PlayLevelEntrance(int levelNumber)
         }
 
         private Sprite PanelSprite(int index) => _panelSprites != null && index >= 0 && index < _panelSprites.Length ? _panelSprites[index] : null;
+        private Sprite PanelSprite(string spriteName) => _panelSprites?.FirstOrDefault(sprite => sprite != null && sprite.name == spriteName);
 
         private RectTransform PanelImage(Transform parent, string name, int spriteIndex, Color tint)
         {

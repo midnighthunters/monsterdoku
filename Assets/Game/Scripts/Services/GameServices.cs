@@ -15,8 +15,9 @@ namespace MonsterLogic.Services
     }
     [Serializable] public sealed class SaveData
     {
-        public int schemaVersion = 5; public bool playerPrefsLinked; public int highestUnlocked = 1; public List<LevelResult> completed = new List<LevelResult>();
+        public int schemaVersion = 6; public bool playerPrefsLinked; public int highestUnlocked = 1; public List<LevelResult> completed = new List<LevelResult>();
         public string currentLevelId = "campaign-001"; public bool tutorialComplete; public SettingsData settings = new SettingsData();
+        public int inProgressLevelContentVersion; public int inProgressGridSize; public string inProgressContentHash;
         public int[] inProgressMonsters = Array.Empty<int>(); public int[] inProgressPlayerNotes = Array.Empty<int>();
         public int inProgressHearts = 3; public int inProgressMistakes; public float inProgressSeconds;
         public int inProgressVillainBoosters = PuzzleSession.DefaultVillainBoosters;
@@ -46,7 +47,7 @@ namespace MonsterLogic.Services
             // cleared and the JSON save must be reset as part of the same operation.
             if (hadSaveFiles && Data.playerPrefsLinked && !PlayerPrefs.HasKey(_prefsMarkerKey)) ResetSaveData();
             Data.playerPrefsLinked = true;
-            Data.schemaVersion = 5;
+            Data.schemaVersion = 6;
             EnsurePrefsMarker();
             WriteToDisk();
         }
@@ -65,6 +66,9 @@ namespace MonsterLogic.Services
         {
             if (session == null || session.IsComplete) return;
             Data.currentLevelId = session.Level.levelId;
+            Data.inProgressLevelContentVersion = session.Level.contentVersion;
+            Data.inProgressGridSize = session.Level.gridSize;
+            Data.inProgressContentHash = session.Level.contentHash;
             Data.inProgressMonsters = session.Monsters.Select((placed, cell) => (placed, cell)).Where(x => x.placed).Select(x => x.cell).ToArray();
             Data.inProgressPlayerNotes = session.PlayerNotes.Select((placed, cell) => (placed, cell)).Where(x => x.placed).Select(x => x.cell).ToArray();
             Data.inProgressHearts = session.Hearts; Data.inProgressMistakes = session.Mistakes; Data.inProgressSeconds = session.ElapsedSeconds;
@@ -74,6 +78,8 @@ namespace MonsterLogic.Services
 
         // A timer alone does not represent player progress. Treat it as a fresh board.
         public bool HasSessionFor(PuzzleLevelData level) => level != null && Data.currentLevelId == level.levelId &&
+            Data.inProgressLevelContentVersion == level.contentVersion && Data.inProgressGridSize == level.gridSize &&
+            string.Equals(Data.inProgressContentHash, level.contentHash, StringComparison.Ordinal) &&
             ((Data.inProgressMonsters?.Length ?? 0) > 0 || (Data.inProgressPlayerNotes?.Length ?? 0) > 0 || Data.inProgressMistakes > 0 ||
              Data.inProgressVillainBoosters < PuzzleSession.DefaultVillainBoosters || Data.inProgressHintBoosters < PuzzleSession.DefaultHintBoosters);
 
@@ -82,6 +88,7 @@ namespace MonsterLogic.Services
             Data.inProgressMonsters = Array.Empty<int>(); Data.inProgressPlayerNotes = Array.Empty<int>();
             Data.inProgressHearts = 3; Data.inProgressMistakes = 0; Data.inProgressSeconds = 0;
             Data.inProgressVillainBoosters = PuzzleSession.DefaultVillainBoosters; Data.inProgressHintBoosters = PuzzleSession.DefaultHintBoosters;
+            Data.inProgressLevelContentVersion = 0; Data.inProgressGridSize = 0; Data.inProgressContentHash = string.Empty;
             if (save) Save();
         }
 
@@ -126,7 +133,7 @@ private void SynchronizeWithPlayerPrefs()
         private void ResetSaveData()
         {
             DeleteSaveFiles();
-            _data = new SaveData { schemaVersion = 5, playerPrefsLinked = true };
+            _data = new SaveData { schemaVersion = 6, playerPrefsLinked = true };
         }
 
         private void EnsurePrefsMarker()
@@ -175,9 +182,15 @@ private void SynchronizeWithPlayerPrefs()
                 data.inProgressVillainBoosters = PuzzleSession.DefaultVillainBoosters;
                 data.inProgressHintBoosters = PuzzleSession.DefaultHintBoosters;
             }
+            if (loadedSchema < 6)
+            {
+                data.inProgressMonsters = Array.Empty<int>(); data.inProgressPlayerNotes = Array.Empty<int>();
+                data.inProgressMistakes = 0; data.inProgressSeconds = 0; data.inProgressLevelContentVersion = 0;
+                data.inProgressGridSize = 0; data.inProgressContentHash = string.Empty;
+            }
             data.inProgressVillainBoosters = Mathf.Max(0, data.inProgressVillainBoosters);
             data.inProgressHintBoosters = Mathf.Max(0, data.inProgressHintBoosters);
-            data.schemaVersion = 5;
+            data.schemaVersion = 6;
             return data;
         }
     }

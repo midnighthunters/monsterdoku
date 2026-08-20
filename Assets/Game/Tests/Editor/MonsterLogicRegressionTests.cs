@@ -16,9 +16,9 @@ namespace MonsterLogic.Tests.Editor
         {
             var database = Resources.Load<PuzzleLevelDatabase>("PuzzleLevelDatabase");
             Assert.That(database, Is.Not.Null);
-            var level = database.GetByNumber(2);
+            var level = database.GetByNumber(21);
             var session = new PuzzleSession(level);
-            Assert.That(session.Monsters, Has.All.False, "A new level must not pre-place villains.");
+            Assert.That(session.Monsters, Has.All.False, "A non-onboarding level must not pre-place villains.");
 
             for (int row = 0; row < level.gridSize; row++)
             {
@@ -30,6 +30,24 @@ namespace MonsterLogic.Tests.Editor
             Assert.That(session.IsComplete, Is.True);
             Assert.That(session.Hearts, Is.EqualTo(3));
         }
+
+        [Test]
+        public void EveryCampaignLevelIsUniqueAndLogicSolvable()
+        {
+            var database = Resources.Load<PuzzleLevelDatabase>("PuzzleLevelDatabase");
+            Assert.That(database, Is.Not.Null);
+            Assert.That(database.levels, Has.Count.EqualTo(250));
+            for (int index = 0; index < database.levels.Count; index++)
+            {
+                var level = database.levels[index];
+                var report = PuzzleValidator.Validate(level);
+                Assert.That(level.displayNumber, Is.EqualTo(index + 1));
+                Assert.That(level.gridSize, Is.EqualTo(ExpectedSize(index + 1)));
+                Assert.That(report.valid, Is.True, level.levelId + " " + report);
+            }
+        }
+
+        private static int ExpectedSize(int level) => level <= 45 ? 6 : level <= 100 ? 7 : level <= 160 ? 8 : level <= 215 ? 9 : level <= 235 ? 10 : 11;
 
         [Test]
         public void EveryCampaignLevelIsUniqueWithoutPresetVillains()

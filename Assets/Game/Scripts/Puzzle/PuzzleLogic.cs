@@ -27,6 +27,20 @@ namespace MonsterLogic.Puzzle
             return true;
         }
 
+        public static string ContentHash(PuzzleLevelData level)
+        {
+            unchecked
+            {
+                uint hash = 2166136261;
+                void Add(int value) { hash = (hash ^ (uint)value) * 16777619; }
+                Add(level.gridSize); Add(level.contentVersion);
+                foreach (int value in level.regionIdByCell ?? Array.Empty<int>()) Add(value);
+                foreach (int value in level.solutionColumnByRow ?? Array.Empty<int>()) Add(value);
+                foreach (int value in level.starterCatCells ?? Array.Empty<int>()) Add(value);
+                return hash.ToString("X8");
+            }
+        }
+
         public static bool PlacementsSatisfyAll(PuzzleLevelData level, bool[] monsters)
         {
             int n = level.gridSize;
@@ -110,7 +124,9 @@ namespace MonsterLogic.Puzzle
         {
             int n = level.gridSize;
             var placed = new bool[n * n]; var excluded = new bool[n * n];
+            foreach (int cell in level.starterCatCells ?? Array.Empty<int>()) if (cell >= 0 && cell < placed.Length) placed[cell] = true;
             int steps = 0, contradictionSteps = 0;
+            report.initialForcedMoves = placed.Count(x => x);
             while (placed.Count(x => x) < n && steps < n * n * 2)
             {
                 ApplyDirectEliminations();
@@ -124,7 +140,8 @@ namespace MonsterLogic.Puzzle
                 excluded[eliminated] = true; steps++; contradictionSteps++; AddTechnique("Controlled contradiction");
             }
             report.deductionSteps = steps;
-            report.difficultyScore = n * 10 + steps * 2 + contradictionSteps * 8;
+            report.maxChainDepth = Math.Max(1, steps - contradictionSteps);
+            report.difficultyScore = n * 18 + steps * 3 + contradictionSteps * 9 - report.initialForcedMoves * 4;
             if (placed.Count(x => x) != n) report.errors.Add("Human-style analyser did not complete the puzzle.");
 
             void ApplyDirectEliminations()
@@ -172,13 +189,16 @@ namespace MonsterLogic.Puzzle
             var report = new ValidationReport();
             if (level == null) { report.errors.Add("Level is null."); return report; }
             int n = level.gridSize;
-            if (n < 5 || n > 8) report.errors.Add("Grid size must be 5 through 8.");
+            if (n < 6 || n > 11) report.errors.Add("Grid size must be 6 through 11.");
             if (level.regionIdByCell == null || level.regionIdByCell.Length != n * n) report.errors.Add("Region cell count is incorrect.");
             if (report.errors.Count > 0) return report;
             var ids = level.regionIdByCell.Distinct().OrderBy(x => x).ToArray();
             if (ids.Length != n || !ids.SequenceEqual(Enumerable.Range(0, n))) report.errors.Add("Region IDs must be contiguous and total N.");
             for (int g = 0; g < n; g++) if (!PuzzleRules.IsRegionConnected(level, g)) report.errors.Add($"Region {g} is disconnected.");
             if (!PuzzleRules.IsCanonicalSolutionValid(level)) report.errors.Add("Canonical solution violates a core rule.");
+            var starters = level.starterCatCells ?? Array.Empty<int>();
+            if (starters.Distinct().Count() != starters.Length || starters.Any(cell => cell < 0 || cell >= n * n || !level.IsSolutionCell(cell)))
+                report.errors.Add("Starter cats must be unique canonical solution cells.");
             report.solutionCount = PuzzleSolver.CountSolutions(level, 2);
             if (report.solutionCount != 1) report.errors.Add($"Expected one solution, found {report.solutionCount}{(report.solutionCount == 2 ? "+" : "")}.");
             if (report.errors.Count == 0) DifficultyAnalyser.Analyse(level, report);
@@ -194,18 +214,18 @@ namespace MonsterLogic.Puzzle
 
         public static List<PuzzleLevelData> GenerateCampaign(int masterSeed = 0x4D4C3235)
         {
-            var levels = new List<PuzzleLevelData>(250); var symmetryKeys = new HashSet<string>();
+            var levels = new List<PuzzleLevelData>(250); var symmetryKeys = new HashSet<string>(); var solutionKeys = new HashSet<string>();
             for (int number = 1; number <= 250; number++)
             {
                 int chapter = (number - 1) / 25 + 1;
-                int n = chapter <= 2 ? 5 : chapter <= 4 ? 6 : chapter <= 6 ? 7 : 8;
+                int n = BoardSizeFor(number);
                 PuzzleLevelData level = null;
                 for (int variant = 0; variant < 80; variant++)
                 {
                     int seed = unchecked(masterSeed + number * 7919 + variant * 104729);
                     level = Generate(number, chapter, n, seed);
                     string key = CanonicalSymmetryKey(level);
-                    if (PuzzleValidator.Validate(level).valid && symmetryKeys.Add(key)) break;
+                    if (PuzzleValidator.Validate(level).valid && symmetryKeys.Add(key) && solutionKeys.Add(string.Join(",", level.solutionColumnByRow))) break;
                     level = null;
                 }
                 if (level == null) throw new InvalidOperationException($"Could not generate unique level {number}.");
@@ -217,81 +237,138 @@ namespace MonsterLogic.Puzzle
         public static PuzzleLevelData Generate(int number, int chapter, int n, int seed)
         {
             var rng = new System.Random(seed);
-            var validPermutations = EnumerateValidPermutations(n);
-            int[] solution = validPermutations[rng.Next(validPermutations.Count)];
-            int[] regions = GrowUniqueRegions(n, solution, rng, validPermutations);
-            var level = new PuzzleLevelData
+            for (int attempt = 0; attempt < 240; attempt++)
             {
-                levelId = $"campaign-{number:000}", chapterId = chapter, displayNumber = number, gridSize = n,
-                regionIdByCell = regions, solutionColumnByRow = solution,
-                characterTheme = Characters[(chapter - 1) % Characters.Length], backgroundTheme = Themes[chapter - 1],
-                difficultyTier = chapter <= 1 ? DifficultyTier.Tutorial : chapter <= 3 ? DifficultyTier.Easy : chapter <= 6 ? DifficultyTier.Medium : chapter <= 8 ? DifficultyTier.Hard : DifficultyTier.Expert,
-                generationSeed = seed, parTimeSeconds = chapter <= 2 ? 90 : chapter <= 4 ? 150 : chapter <= 6 ? 210 : chapter <= 8 ? 300 : 420,
-                contentVersion = 1
-            };
-            var report = PuzzleValidator.Validate(level);
-            int cadence = number % 3 == 0 ? -6 : number % 3;
-            level.difficultyScore = Math.Max(1, report.difficultyScore + chapter * 8 + cadence);
-            level.expectedTechniques = report.techniques.Count > 0 ? report.techniques.ToArray() : new[] { "Direct elimination" };
-            return level;
-        }
-
-        private static List<int[]> EnumerateValidPermutations(int n)
-        {
-            var output = new List<int[]>(); var used = new bool[n]; var values = new int[n];
-            void Build(int row)
-            {
-                if (row == n) { output.Add((int[])values.Clone()); return; }
-                for (int c = 0; c < n; c++) if (!used[c] && (row == 0 || Math.Abs(values[row - 1] - c) > 1))
-                { used[c] = true; values[row] = c; Build(row + 1); used[c] = false; }
+                int[] solution = GenerateSolution(n, rng);
+                int[] regions = GrowUniqueRegions(n, solution, rng);
+                var level = new PuzzleLevelData
+                {
+                    levelId = $"campaign-{number:000}", chapterId = chapter, displayNumber = number, gridSize = n,
+                    regionIdByCell = regions, solutionColumnByRow = solution,
+                    characterTheme = Characters[(chapter - 1) % Characters.Length], backgroundTheme = Themes[chapter - 1],
+                    difficultyTier = DifficultyFor(number), difficultyBand = BandFor(number), archetype = ArchetypeFor(number),
+                    starterCatCells = StarterCatsFor(number, solution), generationSeed = seed, contentVersion = 2,
+                    parTimeSeconds = n <= 6 ? 90 : n == 7 ? 150 : n == 8 ? 210 : n == 9 ? 300 : 420
+                };
+                var report = PuzzleValidator.Validate(level);
+                if (!report.valid) continue;
+                int recovery = number % 7 == 0 ? -12 : 0;
+                level.difficultyScore = Math.Max(1, number * 4 + report.difficultyScore + recovery);
+                level.expectedTechniques = report.techniques.Count > 0 ? report.techniques.ToArray() : new[] { "Direct elimination" };
+                level.logicalSteps = report.deductionSteps; level.maxChainDepth = report.maxChainDepth; level.initialForcedMoves = report.initialForcedMoves;
+                level.contentHash = PuzzleRules.ContentHash(level);
+                return level;
             }
-            Build(0); return output;
+            throw new InvalidOperationException($"Region generator exhausted level {number} after 240 original candidates.");
         }
 
-        private static int[] GrowUniqueRegions(int n, int[] solution, System.Random rng, List<int[]> permutations)
+        private static int BoardSizeFor(int level) => level <= 45 ? 6 : level <= 100 ? 7 : level <= 160 ? 8 : level <= 215 ? 9 : level <= 235 ? 10 : 11;
+        private static string BandFor(int level) => level <= 10 ? "Tutorial" : level <= 20 ? "Very Easy" : level <= 45 ? "Easy" : level <= 70 ? "Easy+" : level <= 100 ? "Medium" : level <= 130 ? "Medium" : level <= 160 ? "Medium-Hard" : level <= 190 ? "Hard" : level <= 215 ? "Hard+" : level <= 235 ? "Expert" : "Expert+";
+        private static DifficultyTier DifficultyFor(int level) => level <= 20 ? DifficultyTier.Tutorial : level <= 70 ? DifficultyTier.Easy : level <= 130 ? DifficultyTier.Medium : level <= 215 ? DifficultyTier.Hard : DifficultyTier.Expert;
+        private static string ArchetypeFor(int level)
         {
-            for (int restart = 0; restart < 30; restart++)
+            string[] archetypes = { "SmallRegionOpening", "EdgePressure", "CenterLock", "DiagonalChain", "RowCascade", "ColumnCascade", "Staircase", "LongCorridor", "LargeAmbiguousRegion", "TwoSidedSolve", "SpiralReasoning", "CenterOut", "LateUnlock" };
+            return archetypes[(level * 7 + level / 9) % archetypes.Length];
+        }
+        private static int[] StarterCatsFor(int level, int[] solution)
+        {
+            bool useStarter = level <= 10 || (level <= 20 && level % 4 == 0) || (level >= 46 && level <= 55 && level % 3 == 1) || (level >= 101 && level <= 108 && level % 2 == 1) || (level >= 161 && level <= 167 && level % 3 == 2);
+            int row = level % solution.Length;
+            return useStarter ? new[] { row * solution.Length + solution[row] } : Array.Empty<int>();
+        }
+
+        private static int[] GenerateSolution(int n, System.Random rng)
+        {
+            var result = new int[n]; var used = new bool[n];
+            bool Search(int row)
             {
-                var regions = new int[n * n]; for (int i = 0; i < regions.Length; i++) regions[i] = i / n;
-                int count = Count(permutations, regions, n, 999999);
-                for (int iteration = 0; iteration < 15000 && count != 1; iteration++)
+                if (row == n) return true;
+                var candidates = Enumerable.Range(0, n).Where(column => !used[column] && (row == 0 || Math.Abs(result[row - 1] - column) > 1)).OrderBy(_ => rng.Next()).ToArray();
+                foreach (int column in candidates)
+                {
+                    result[row] = column; used[column] = true;
+                    if (Search(row + 1)) return true;
+                    used[column] = false;
+                }
+                return false;
+            }
+            if (!Search(0)) throw new InvalidOperationException("Could not construct a non-touching solution.");
+            return result;
+        }
+
+        private static int[] GrowUniqueRegions(int n, int[] solution, System.Random rng)
+        {
+            for (int restart = 0; restart < (n <= 8 ? 480 : 0); restart++)
+            {
+                var regions = new int[n * n];
+                for (int cell = 0; cell < regions.Length; cell++) regions[cell] = cell / n;
+                for (int iteration = 0; iteration < n * n * 20; iteration++)
                 {
                     int cell = rng.Next(regions.Length), source = regions[cell], row = cell / n, column = cell % n;
-                    if (row == source && solution[source] == column) continue;
-                    var neighbours = new List<int>(4);
+                    if (cell == source * n + solution[source]) continue;
+                    var owners = new List<int>(4);
                     Add(row - 1, column); Add(row + 1, column); Add(row, column - 1); Add(row, column + 1);
-                    if (neighbours.Count == 0) continue;
-                    int target = neighbours[rng.Next(neighbours.Count)]; regions[cell] = target;
-                    if (!Connected(regions, n, source)) { regions[cell] = source; continue; }
-                    int next = Count(permutations, regions, n, count + 1);
-                    if (next == 0 || next > count) { regions[cell] = source; continue; }
-                    count = next;
-                    void Add(int r, int c) { if (r >= 0 && r < n && c >= 0 && c < n && regions[r * n + c] != source && !neighbours.Contains(regions[r * n + c])) neighbours.Add(regions[r * n + c]); }
+                    if (owners.Count == 0) continue;
+                    int target = owners[rng.Next(owners.Count)]; regions[cell] = target;
+                    if (!RegionIsConnected(regions, n, source)) regions[cell] = source;
+                    void Add(int r, int c)
+                    {
+                        if (r < 0 || r >= n || c < 0 || c >= n) return;
+                        int owner = regions[r * n + c];
+                        if (owner != source && !owners.Contains(owner)) owners.Add(owner);
+                    }
                 }
-                if (count == 1) return regions;
+                var candidate = new PuzzleLevelData { gridSize = n, regionIdByCell = regions, solutionColumnByRow = solution, starterCatCells = Array.Empty<int>(), contentVersion = 2 };
+                if (PuzzleSolver.CountSolutions(candidate, 2) == 1) return regions;
             }
-            throw new InvalidOperationException("Region generator exhausted deterministic restarts.");
-        }
-
-        private static int Count(List<int[]> permutations, int[] regions, int n, int earlyExit)
-        {
-            int count = 0;
-            foreach (var p in permutations)
+            for (int attempt = 0; attempt < 2000; attempt++)
             {
-                var used = new bool[n]; bool ok = true;
-                for (int r = 0; r < n; r++) { int g = regions[r * n + p[r]]; if (used[g]) { ok = false; break; } used[g] = true; }
-                if (ok && ++count >= earlyExit) break;
+                var compact = BuildConstrainedRegionMap(n, solution, rng);
+                if (compact == null) continue;
+                var candidate = new PuzzleLevelData { gridSize = n, regionIdByCell = compact, solutionColumnByRow = solution, starterCatCells = Array.Empty<int>(), contentVersion = 2 };
+                if (PuzzleSolver.CountSolutions(candidate, 2) == 1) return compact;
             }
-            return count;
+            throw new InvalidOperationException("Could not create a unique connected region map.");
         }
 
-        private static bool Connected(int[] regions, int n, int region)
+        private static int[] BuildConstrainedRegionMap(int n, int[] solution, System.Random rng)
+        {
+            var regions = Enumerable.Repeat(n - 1, n * n).ToArray();
+            var solutionCells = new HashSet<int>(Enumerable.Range(0, n).Select(row => row * n + solution[row]));
+            for (int region = 0; region < n - 1; region++)
+            {
+                int seed = region * n + solution[region]; regions[seed] = region;
+                int row = seed / n, column = seed % n;
+                var choices = new List<int>(); Add(row - 1, column); Add(row + 1, column); Add(row, column - 1); Add(row, column + 1);
+                if (choices.Count == 0) return null;
+                regions[choices[rng.Next(choices.Count)]] = region;
+                void Add(int r, int c)
+                {
+                    if (r < 0 || r >= n || c < 0 || c >= n) return;
+                    int cell = r * n + c;
+                    if (!solutionCells.Contains(cell) && regions[cell] == n - 1) choices.Add(cell);
+                }
+            }
+            for (int region = 0; region < n; region++) if (!RegionIsConnected(regions, n, region)) return null;
+            return regions;
+        }
+
+        private static bool RegionIsConnected(int[] regions, int n, int region)
         {
             int first = Array.IndexOf(regions, region); if (first < 0) return false;
-            var seen = new bool[regions.Length]; var q = new Queue<int>(); q.Enqueue(first); seen[first] = true; int count = 0;
-            while (q.Count > 0) { int x = q.Dequeue(); count++; int r = x / n, c = x % n; Add(r - 1, c); Add(r + 1, c); Add(r, c - 1); Add(r, c + 1); }
-            return count == regions.Count(x => x == region);
-            void Add(int r, int c) { if (r < 0 || r >= n || c < 0 || c >= n) return; int i = r * n + c; if (!seen[i] && regions[i] == region) { seen[i] = true; q.Enqueue(i); } }
+            var seen = new bool[regions.Length]; var queue = new Queue<int>(); queue.Enqueue(first); seen[first] = true; int count = 0;
+            while (queue.Count > 0)
+            {
+                int cell = queue.Dequeue(); count++; int row = cell / n, column = cell % n;
+                Add(row - 1, column); Add(row + 1, column); Add(row, column - 1); Add(row, column + 1);
+            }
+            return count == regions.Count(cell => cell == region);
+            void Add(int row, int column)
+            {
+                if (row < 0 || row >= n || column < 0 || column >= n) return;
+                int cell = row * n + column;
+                if (!seen[cell] && regions[cell] == region) { seen[cell] = true; queue.Enqueue(cell); }
+            }
         }
 
         public static string CanonicalSymmetryKey(PuzzleLevelData level)

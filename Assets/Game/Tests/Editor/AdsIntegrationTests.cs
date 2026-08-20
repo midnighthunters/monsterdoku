@@ -190,7 +190,7 @@ namespace MonsterLogic.Tests.Editor
             try
             {
                 var database = Resources.Load<PuzzleLevelDatabase>("PuzzleLevelDatabase");
-                var session = new PuzzleSession(database.GetByNumber(2));
+                var session = new PuzzleSession(database.GetByNumber(21));
                 var save = new SaveService(savePath, marker);
                 var fake = new FakeAdService();
                 var app = host.AddComponent<MonsterLogicApp>();

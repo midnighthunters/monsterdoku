@@ -41,6 +41,7 @@ namespace MonsterLogic.Puzzle
             Level = level ?? throw new ArgumentNullException(nameof(level));
             int count = level.gridSize * level.gridSize;
             Monsters = new bool[count]; PlayerNotes = new bool[count]; AutomaticNoteSources = new int[count];
+            foreach (int cell in level.starterCatCells ?? Array.Empty<int>()) if (cell >= 0 && cell < count) Monsters[cell] = true;
             Hearts = 3; Mistakes = 0; VillainBoosters = DefaultVillainBoosters; HintBoosters = DefaultHintBoosters;
             IsComplete = false; ElapsedSeconds = 0; _hintStage = 0; _history.Clear();
             RebuildAutomaticNotes(); Changed?.Invoke();
@@ -52,6 +53,7 @@ namespace MonsterLogic.Puzzle
             if (Level == null) return false;
             int count = Level.gridSize * Level.gridSize;
             var restoredMonsters = new bool[count];
+            foreach (int cell in Level.starterCatCells ?? Array.Empty<int>()) if (cell >= 0 && cell < count) restoredMonsters[cell] = true;
             foreach (int cell in monsterCells ?? Enumerable.Empty<int>())
                 if (cell >= 0 && cell < count && Level.IsSolutionCell(cell)) restoredMonsters[cell] = true;
 
@@ -201,7 +203,7 @@ namespace MonsterLogic.Puzzle
             return PuzzleSolver.CountSolutions(Level, 1, required) > 0;
         }
 
-        private bool CanEdit(int cell) => cell >= 0 && cell < Monsters.Length && !IsComplete && Hearts > 0;
+        private bool CanEdit(int cell) => cell >= 0 && cell < Monsters.Length && !IsComplete && Hearts > 0 && !Level.IsStarterCat(cell);
 
         private void PushSnapshot() => _history.Push(new Snapshot { monsters = (bool[])Monsters.Clone(), playerNotes = (bool[])PlayerNotes.Clone() });
 

@@ -7,9 +7,9 @@ namespace MonsterLogic.Puzzle
     [CreateAssetMenu(fileName = "PuzzleLevelDatabase", menuName = "Monster Logic/Puzzle Level Database")]
     public sealed class PuzzleLevelDatabase : ScriptableObject
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
         public int schemaVersion = CurrentSchemaVersion;
-        public string contentVersion = "1.0.0";
+        public string contentVersion = "2.0.0";
         public List<PuzzleLevelData> levels = new List<PuzzleLevelData>(250);
 
         private Dictionary<string, PuzzleLevelData> _byId;
@@ -22,7 +22,9 @@ namespace MonsterLogic.Puzzle
 
         public PuzzleLevelData GetByNumber(int displayNumber)
         {
-            return displayNumber >= 1 && displayNumber <= levels.Count ? levels[displayNumber - 1] : null;
+            if (displayNumber < 1) return null;
+            EnsureIndex();
+            return levels.Find(level => level != null && level.displayNumber == displayNumber);
         }
 
         public void EnsureIndex()
@@ -35,7 +37,7 @@ namespace MonsterLogic.Puzzle
 
         public void MigrateIfNeeded()
         {
-            if (schemaVersion < 1) schemaVersion = 1;
+            if (schemaVersion < CurrentSchemaVersion) schemaVersion = CurrentSchemaVersion;
         }
     }
 }
