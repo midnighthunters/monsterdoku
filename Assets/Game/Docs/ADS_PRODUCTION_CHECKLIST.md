@@ -11,7 +11,7 @@ Current blockers found in the repository:
 - AppLovin SDK key is blank in AppLovin Integration Manager settings.
 - Android and iOS AdMob App IDs are blank.
 - MAX consent flow is disabled and its privacy/terms URLs are blank.
-- `developmentTestMode` is `false`; when enabled it only turns on verbose MAX logging—it does **not** enable test inventory.
+- `developmentTestMode` is `false`; in a Unity Development build it enables verbose MAX logs and the Settings diagnostics entry point—it does **not** enable test inventory. It is disabled in nondevelopment player builds.
 - No checked-in MAX/AdMob test-device identifiers were found.
 - The generated iOS `Info.plist`, CocoaPods resolution, privacy manifest, and SKAdNetwork entries have not been verified.
 - iOS signing/team settings are blank and the iPhone build number is `0`.
@@ -30,7 +30,7 @@ Do not ship an IPA until the release validation and physical-device checks pass.
   - [ ] MAX terms/privacy consent flow, or
   - [ ] An approved Google-certified CMP integrated for the applicable regions.
 - [ ] For EEA/UK users, verify the CMP/IAB TCF requirements for Google demand.
-- [ ] Provide a way for users to revisit privacy choices when required. The game service exposes `ShowPrivacyOptions`, but the current UI does not appear to call it.
+- [ ] Verify **Settings > Manage Privacy Choices** is visible and opens the configured CMP's choices UI for users who need to revisit consent.
 - [ ] Add/verify the required `app-ads.txt` entries for AppLovin and Google at the publisher's authorized domain.
 - [ ] Check App Store privacy disclosures and the equivalent Google data-safety declarations.
 
@@ -74,6 +74,7 @@ Open **AppLovin > Integration Manager** and complete the following:
 - [ ] Configure MAX test mode/test devices before any development request using production units.
 - [ ] Run the supported Android/iOS dependency resolver after changing mediation packages.
 - [ ] Check that only MAX-mediated Google packages are installed; do not add the standalone Google Mobile Ads Unity runtime.
+- [ ] Resolve the duplicated MAX installation before a mobile build: Unity reports GUID conflicts between `Assets/MaxSdk` and `Packages/com.applovin.mediation.ads`. Retain only the supported copy through the AppLovin migration/Integration Manager workflow; do not delete either copy blindly.
 - [ ] Check the External Dependency Manager version/resolution and remove any duplicate or stale resolver setup.
 
 Update `Assets/Game/Ads/Resources/AdsConfig.asset`:
@@ -81,7 +82,7 @@ Update `Assets/Game/Ads/Resources/AdsConfig.asset`:
 - [ ] Replace all six `REPLACE_ME_*` values with real MAX IDs.
 - [ ] Replace both `REPLACE_ME_HTTPS_*` values with real HTTPS URLs.
 - [ ] Set `generalAudienceAdsApproved: 1` only after the publisher/privacy review is complete.
-- [ ] Leave `developmentTestMode: 1` for a development/test build if verbose MAX logs are desired.
+- [ ] Set `developmentTestMode: 1` only for a Unity Development device test; it enables MAX logs and the Settings diagnostics entry point, not test inventory.
 - [ ] Do not assume `developmentTestMode` alone makes ads safe; test mode must also be enabled for the device/network in MAX.
 
 ## 4. Test-mode procedure (physical iPhone)
@@ -93,7 +94,7 @@ The Unity Editor uses `NoOpAdService`; live MAX ads do not run in Editor Play Mo
 - [ ] Use real MAX app/ad-unit IDs and real Integration Manager credentials. Do not use placeholder IDs.
 - [ ] Add the test iPhone's advertising identifier to MAX test-device configuration, or use the MAX Mediation Debugger in the app to enable test ads.
 - [ ] Enable test mode for the relevant mediated networks, including Google/AdMob, according to the MAX dashboard/network configuration.
-- [ ] Set `developmentTestMode: 1` only if verbose SDK logs are wanted. This project flag is diagnostics only.
+- [ ] Set `developmentTestMode: 1` only for a Unity Development device test if verbose logs and **Settings > Open Ad Diagnostics** are required. It does not enable test inventory and is compiled out of a nondevelopment player build.
 - [ ] Build as a **Development** iOS build and install on the registered test iPhone.
 - [ ] Open the MAX Mediation Debugger and confirm the SDK and Google adapter initialize.
 - [ ] Check device/Xcode logs for `Test Mode On: true` during MAX initialization.

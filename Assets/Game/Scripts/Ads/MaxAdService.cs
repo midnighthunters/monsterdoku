@@ -89,7 +89,11 @@ namespace MonsterLogic.Ads
 
             try
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 MaxSdk.SetVerboseLogging(_config.developmentTestMode);
+#else
+                MaxSdk.SetVerboseLogging(false);
+#endif
                 MaxSdk.InitializeSdk(new[] { _rewardedAdUnitId, _interstitialAdUnitId, _bannerAdUnitId });
                 StartCoroutine(InitializationTimeout());
             }
@@ -198,6 +202,35 @@ namespace MonsterLogic.Ads
                 Debug.LogWarning("MAX privacy choices could not open: " + exception.Message);
                 if (!callbackInvoked) InvokeSafely(completed, false);
             }
+        }
+
+        /// <summary>
+        /// Opens MAX's integration and test-ad diagnostics only in a Unity Development build.
+        /// This does not enable test inventory; device and mediated-network test mode remain dashboard settings.
+        /// </summary>
+        public void ShowMediationDebugger(Action<bool> completed)
+        {
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+            InvokeSafely(completed, false);
+            return;
+#else
+            if (!IsInitialized || _config == null || !_config.developmentTestMode)
+            {
+                InvokeSafely(completed, false);
+                return;
+            }
+
+            try
+            {
+                MaxSdk.ShowMediationDebugger();
+                InvokeSafely(completed, true);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("MAX Mediation Debugger could not open: " + exception.Message);
+                InvokeSafely(completed, false);
+            }
+#endif
         }
 
         public void Shutdown()

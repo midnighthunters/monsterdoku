@@ -862,22 +862,71 @@ private void OnCorrectPlacement()
 
         private void ConfirmRestart() => ShowModal("RESTART PUZZLE?", "Your notes and placed villains will be cleared.", "RESTART", RestartCurrentLevel, "KEEP PLAYING", () => { });
 
-private void ShowSettings()
+        private void ShowSettings()
         {
             if (_adBreakActive || GameObject.Find("SettingsOverlay") != null) return;
+
+            var adsConfig = Resources.Load<AdsConfig>("AdsConfig");
+            string termsUrl = TermsUrl;
+            if (adsConfig != null && Uri.TryCreate(adsConfig.termsOfServiceUrl, UriKind.Absolute, out var termsUri) && termsUri.Scheme == Uri.UriSchemeHttps)
+                termsUrl = termsUri.AbsoluteUri;
+
+            string privacyUrl = PrivacyUrl;
+            if (adsConfig != null && Uri.TryCreate(adsConfig.privacyPolicyUrl, UriKind.Absolute, out var privacyUri) && privacyUri.Scheme == Uri.UriSchemeHttps)
+                privacyUrl = privacyUri.AbsoluteUri;
+
+            var maxAds = _ads as MaxAdService;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            bool showAdDiagnostics = adsConfig != null && adsConfig.developmentTestMode && maxAds != null && maxAds.IsInitialized;
+#else
+            bool showAdDiagnostics = false;
+#endif
             var overlay = BeginOverlay("SettingsOverlay", new Color(.05f, .035f, .09f, .76f));
             overlay.GetComponent<Image>().raycastTarget = true;
-            var sheet = Panel(overlay, "SettingsSheet", new Color(.985f, .955f, .90f, 1f)); Anchor(sheet, .5f, .50f, 760, 820);
+            float sheetHeight = showAdDiagnostics ? 900f : 820f;
+            var sheet = Panel(overlay, "SettingsSheet", new Color(.985f, .955f, .90f, 1f)); Anchor(sheet, .5f, .50f, 760, sheetHeight);
             var header = Image(sheet, "Header", new Color(.94f, .86f, .78f)); header.sprite = RuntimeArt.RoundedSprite(28); header.type = UnityEngine.UI.Image.Type.Sliced; Anchor(header.rectTransform, .5f, .94f, 760, 132);
             var title = DisplayText(sheet, "Title", "SETTINGS", 52, new Color(.35f, .18f, .25f), TextAlignmentOptions.Center); title.outlineWidth = 0; Anchor(title.rectTransform, .5f, .94f, 490, 78);
             var close = IconButton(sheet, "Close", RuntimeIcon.Close, () => CloseOverlay(overlay.gameObject)); Anchor(close, .90f, .94f, 70, 70);
 
-            var feedback = Button(sheet, "Feedback", "SEND FEEDBACK", () => Application.OpenURL(FeedbackUrl)); Anchor(feedback, .5f, .68f, 620, 96);
-            var terms = Button(sheet, "TermsOfService", "TERMS OF SERVICE", () => Application.OpenURL(TermsUrl), false); Anchor(terms, .5f, .49f, 620, 76);
+            float feedbackY = showAdDiagnostics ? .75f : .70f;
+            float termsY = showAdDiagnostics ? .59f : .52f;
+            float privacyY = showAdDiagnostics ? .46f : .38f;
+            float privacyChoicesY = showAdDiagnostics ? .33f : .24f;
+            float musicY = showAdDiagnostics ? .07f : .10f;
+
+            var feedback = Button(sheet, "Feedback", "SEND FEEDBACK", () => Application.OpenURL(FeedbackUrl)); Anchor(feedback, .5f, feedbackY, 620, 96);
+            var terms = Button(sheet, "TermsOfService", "TERMS OF SERVICE", () => Application.OpenURL(termsUrl), false); Anchor(terms, .5f, termsY, 620, 76);
             terms.GetComponent<Image>().color = Color.white; terms.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
-            var privacy = Button(sheet, "PrivacyPolicy", "PRIVACY POLICY", () => Application.OpenURL(PrivacyUrl), false); Anchor(privacy, .5f, .35f, 620, 76);
+            var privacy = Button(sheet, "PrivacyPolicy", "PRIVACY POLICY", () => Application.OpenURL(privacyUrl), false); Anchor(privacy, .5f, privacyY, 620, 76);
             privacy.GetComponent<Image>().color = Color.white; privacy.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
-            var music = Button(sheet, "MusicToggle", MusicButtonText(), ToggleMusic, false); Anchor(music, .5f, .21f, 620, 76);
+            var privacyChoices = Button(sheet, "PrivacyChoices", "MANAGE PRIVACY CHOICES", () =>
+            {
+                if (_ads == null || !_ads.CanShowPrivacyOptions)
+                {
+                    ShowToast("Privacy choices are not available right now.");
+                    return;
+                }
+
+                _ads.ShowPrivacyOptions(opened =>
+                {
+                    if (!opened) ShowToast("Privacy choices could not open. Please try again.");
+                });
+            }, false);
+            Anchor(privacyChoices, .5f, privacyChoicesY, 620, 76);
+            privacyChoices.GetComponent<Image>().color = Color.white; privacyChoices.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
+
+            if (showAdDiagnostics)
+            {
+                var diagnostics = Button(sheet, "AdDiagnostics", "OPEN AD DIAGNOSTICS", () => maxAds.ShowMediationDebugger(opened =>
+                {
+                    if (!opened) ShowToast("Ad diagnostics are not available yet. Wait for MAX to initialize.");
+                }), false);
+                Anchor(diagnostics, .5f, .20f, 620, 76);
+                diagnostics.GetComponent<Image>().color = Color.white; diagnostics.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
+            }
+
+            var music = Button(sheet, "MusicToggle", MusicButtonText(), ToggleMusic, false); Anchor(music, .5f, musicY, 620, 76);
             music.GetComponent<Image>().color = Color.white;
             _musicSettingLabel = music.Find("Label").GetComponent<TMP_Text>();
             _musicSettingLabel.color = new Color(.42f, .27f, .28f);

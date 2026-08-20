@@ -12,7 +12,7 @@ namespace MonsterLogic.Ads
         public bool adsEnabled = true;
         [Tooltip("Keep false until the publisher confirms this is a general-audience app and completes the privacy review.")]
         public bool generalAudienceAdsApproved;
-        [Tooltip("Enables verbose MAX diagnostics only. Test devices/test mode must still be configured in MAX and AdMob.")]
+        [Tooltip("Enables verbose MAX diagnostics and the in-app Mediation Debugger only in a Unity Development build. Test devices/test mode must still be configured in MAX and AdMob.")]
         public bool developmentTestMode;
 
         [Header("Android MAX ad units")]

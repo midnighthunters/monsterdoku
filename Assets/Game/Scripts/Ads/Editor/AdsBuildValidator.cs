@@ -51,7 +51,7 @@ namespace MonsterLogic.Ads.Editor
 
             errors.AddRange(config.GetValidationErrors(target == BuildTarget.Android));
             ValidatePackageManifest(errors);
-            ValidateIntegrationManager(errors);
+            ValidateIntegrationManager(errors, target);
 
             if (target == BuildTarget.Android)
             {
@@ -73,24 +73,46 @@ namespace MonsterLogic.Ads.Editor
                 errors.Add("A standalone Google Mobile Ads Unity runtime appears in Packages; AdMob must only be installed as a MAX-mediated adapter.");
         }
 
-        private static void ValidateIntegrationManager(ICollection<string> errors)
+        private static void ValidateIntegrationManager(ICollection<string> errors, BuildTarget target)
         {
             try
             {
+                var config = Resources.Load<AdsConfig>("AdsConfig");
                 var settings = AppLovinSettings.Instance;
                 if (AdsConfig.IsPlaceholder(settings.SdkKey)) errors.Add("AppLovin SDK key is missing in AppLovin > Integration Manager.");
-                if (AdsConfig.IsPlaceholder(settings.AdMobAndroidAppId)) errors.Add("Android AdMob App ID is missing in AppLovin > Integration Manager.");
-                if (AdsConfig.IsPlaceholder(settings.AdMobIosAppId)) errors.Add("iOS AdMob App ID is missing in AppLovin > Integration Manager.");
+
+                if (target == BuildTarget.Android && AdsConfig.IsPlaceholder(settings.AdMobAndroidAppId))
+                    errors.Add("Android AdMob App ID is missing in AppLovin > Integration Manager.");
+                if (target == BuildTarget.iOS && AdsConfig.IsPlaceholder(settings.AdMobIosAppId))
+                    errors.Add("iOS AdMob App ID is missing in AppLovin > Integration Manager.");
 
                 var privacy = AppLovinInternalSettings.Instance;
                 if (!privacy.ConsentFlowEnabled) errors.Add("MAX terms and privacy policy flow is not enabled in Integration Manager.");
                 if (!IsHttps(privacy.ConsentFlowPrivacyPolicyUrl)) errors.Add("MAX consent-flow privacy policy URL is missing or not HTTPS.");
                 if (!IsHttps(privacy.ConsentFlowTermsOfServiceUrl)) errors.Add("MAX consent-flow terms URL is missing or not HTTPS.");
+
+                if (config != null && IsHttps(config.privacyPolicyUrl) && IsHttps(privacy.ConsentFlowPrivacyPolicyUrl) && !UrlsMatch(config.privacyPolicyUrl, privacy.ConsentFlowPrivacyPolicyUrl))
+                    errors.Add("AdsConfig privacy policy URL must match the MAX consent-flow privacy policy URL.");
+                if (config != null && IsHttps(config.termsOfServiceUrl) && IsHttps(privacy.ConsentFlowTermsOfServiceUrl) && !UrlsMatch(config.termsOfServiceUrl, privacy.ConsentFlowTermsOfServiceUrl))
+                    errors.Add("AdsConfig terms URL must match the MAX consent-flow terms URL.");
             }
             catch (Exception exception)
             {
                 errors.Add("AppLovin Integration Manager settings could not be validated: " + exception.Message);
             }
+        }
+
+        private static bool UrlsMatch(string left, string right)
+        {
+            if (!Uri.TryCreate(left, UriKind.Absolute, out var leftUri)) return false;
+            if (!Uri.TryCreate(right, UriKind.Absolute, out var rightUri)) return false;
+
+            return string.Equals(leftUri.Scheme, rightUri.Scheme, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(leftUri.Host, rightUri.Host, StringComparison.OrdinalIgnoreCase)
+                && leftUri.Port == rightUri.Port
+                && string.Equals(leftUri.UserInfo, rightUri.UserInfo, StringComparison.Ordinal)
+                && string.Equals(leftUri.PathAndQuery, rightUri.PathAndQuery, StringComparison.Ordinal)
+                && string.Equals(leftUri.Fragment, rightUri.Fragment, StringComparison.Ordinal);
         }
 
         private static void RequirePackage(string manifest, string package, string label, ICollection<string> errors)
