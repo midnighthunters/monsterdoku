@@ -193,7 +193,7 @@ namespace MonsterLogic.UI
         {
             PersistSession(); _session = null; BeginScreen("Home"); AddBackdrop(_screen.transform, Mathf.Max(0, (_save.Data.highestUnlocked - 1) / 25));
             var emblem = RawButton(_screen.transform, "ChapterLogo", _appIcon, ShowLevelSelect); Anchor(emblem, .5f, .72f, 340, 340);
-            var title = Text(_screen.transform, "Title", "MONSTER\nLOGIC", 82, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(title.rectTransform, .5f, .49f, 760, 210);
+            var title = Text(_screen.transform, "Title", "monsterdoku", 82, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(title.rectTransform, .5f, .49f, 760, 210);
             bool canContinue = _save.Data.highestUnlocked > 1 && _save.Data.currentLevelId == $"campaign-{_save.Data.highestUnlocked:000}";
             var play = Button(_screen.transform, "Play", canContinue ? $"CONTINUE  ·  LEVEL {_save.Data.highestUnlocked}" : "PLAY", () => StartLevel(_save.Data.highestUnlocked)); Anchor(play, .5f, .30f, 650, 118);
             var footer = Text(_screen.transform, "Footer", "250 puzzles  •  Optional rewards  •  Progress saved", 20, _theme.muted, FontStyles.Normal, TextAlignmentOptions.Center); Anchor(footer.rectTransform, .5f, .08f, 760, 46);
@@ -1011,13 +1011,6 @@ private IEnumerator PlayLevelEntrance(int levelNumber)
                     Anchor(dot.rectTransform, x, y, 6, 6);
                 }
             }
-
-            var tombstone = SpritePanel(parent, "TombstoneDecoration", _gameSprites != null ? _gameSprites.TombstoneDecoration : null, Color.white);
-            Anchor(tombstone, .105f, .068f, 142, 164);
-            var candle = SpritePanel(parent, "CandleDecoration", _gameSprites != null ? _gameSprites.Candle : null, Color.white);
-            Anchor(candle, .205f, .045f, 70, 104);
-            var pumpkin = SpritePanel(parent, "PumpkinDecoration", _gameSprites != null ? _gameSprites.Pumpkin : null, Color.white);
-            Anchor(pumpkin, .895f, .06f, 196, 148);
         }
 
         private void BuildStats(PuzzleLevelData level)

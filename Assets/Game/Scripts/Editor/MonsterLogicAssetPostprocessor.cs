@@ -19,10 +19,10 @@ namespace MonsterLogic.EditorTools
             importer.maxTextureSize = assetPath.EndsWith("MonsterHeads.png") ? 2048 : 1024;
         }
 
-        [MenuItem("Monster Logic/Configure Product Settings")]
+        [MenuItem("monsterdoku/Configure Product Settings")]
         public static void ConfigureProduct()
         {
-            PlayerSettings.productName = "Monster Logic"; PlayerSettings.companyName = "Zemo Labs";
+            PlayerSettings.productName = "monsterdoku"; PlayerSettings.companyName = "Zemo Labs";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.zemolabs.monsterlogic");
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, "com.zemolabs.monsterlogic");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
@@ -32,16 +32,16 @@ namespace MonsterLogic.EditorTools
                 PlayerSettings.SetIcons(NamedBuildTarget.Android, new[] { icon }, IconKind.Application);
                 PlayerSettings.SetIcons(NamedBuildTarget.iOS, new[] { icon }, IconKind.Application);
             }
-            AssetDatabase.SaveAssets(); Debug.Log("Monster Logic product name, identifiers, portrait orientation, and app icon configured.");
+            AssetDatabase.SaveAssets(); Debug.Log("monsterdoku product name, identifiers, portrait orientation, and app icon configured.");
         }
 
-        [MenuItem("Monster Logic/Import TMP Essentials")]
+        [MenuItem("monsterdoku/Import TMP Essentials")]
         public static void ImportTmpEssentials()
         {
             var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(TMP_Text).Assembly);
             string source = Path.Combine(package.resolvedPath, "Package Resources", "TMP Essential Resources.unitypackage");
             AssetDatabase.ImportPackage(source, false);
-            Debug.Log("TextMeshPro essential resources imported for Monster Logic.");
+            Debug.Log("TextMeshPro essential resources imported for monsterdoku.");
         }
     }
 }
