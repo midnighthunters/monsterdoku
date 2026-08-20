@@ -84,14 +84,75 @@ namespace MonsterLogic.UI
 
         private void BuildFoundation()
         {
+            if (TryUseAuthoredFoundation())
+            {
+                EnsureEventSystem();
+                return;
+            }
+
             var canvasGo = new GameObject("MonsterLogicCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            canvasGo.transform.SetParent(transform, false); _canvas = canvasGo.GetComponent<Canvas>(); _canvas.renderMode = RenderMode.ScreenSpaceCamera; _canvas.worldCamera = Camera.main; _canvas.planeDistance = 1f;
-            var scaler = canvasGo.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; scaler.referenceResolution = new Vector2(900, 1600); scaler.matchWidthOrHeight = .5f;
-            var safe = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaFitter)); safe.transform.SetParent(canvasGo.transform, false); _safeRoot = safe.GetComponent<RectTransform>(); Stretch(_safeRoot);
-            var content = new GameObject("BannerAwareContent", typeof(RectTransform), typeof(BannerAwareContentLayout)); content.transform.SetParent(_safeRoot, false); _contentRoot = content.GetComponent<RectTransform>(); Stretch(_contentRoot);
-            _bannerLayout = content.GetComponent<BannerAwareContentLayout>(); _bannerLayout.Configure(_canvas);
-            if (FindFirstObjectByType<EventSystem>() == null)
-            { var es = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule)); es.transform.SetParent(transform, false); }
+            canvasGo.transform.SetParent(transform, false);
+            _canvas = canvasGo.GetComponent<Canvas>();
+            ConfigureCanvas(_canvas);
+
+            var safe = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaFitter));
+            safe.transform.SetParent(canvasGo.transform, false);
+            _safeRoot = safe.GetComponent<RectTransform>();
+            Stretch(_safeRoot);
+
+            var content = new GameObject("BannerAwareContent", typeof(RectTransform), typeof(BannerAwareContentLayout));
+            content.transform.SetParent(_safeRoot, false);
+            _contentRoot = content.GetComponent<RectTransform>();
+            Stretch(_contentRoot);
+            _bannerLayout = content.GetComponent<BannerAwareContentLayout>();
+            _bannerLayout.Configure(_canvas);
+            EnsureEventSystem();
+        }
+
+        private bool TryUseAuthoredFoundation()
+        {
+            var canvasRoot = transform.Find("MonsterLogicCanvas");
+            if (canvasRoot == null) return false;
+
+            var canvas = canvasRoot.GetComponent<Canvas>();
+            var safeRoot = canvasRoot.Find("SafeArea") as RectTransform;
+            var contentRoot = safeRoot != null ? safeRoot.Find("BannerAwareContent") as RectTransform : null;
+            var bannerLayout = contentRoot != null ? contentRoot.GetComponent<BannerAwareContentLayout>() : null;
+            if (canvas == null || safeRoot == null || contentRoot == null || bannerLayout == null)
+            {
+                Debug.LogWarning("Monster Logic found an authored MonsterLogicCanvas, but it is missing Canvas, SafeArea, or BannerAwareContent. Creating a runtime fallback instead.");
+                return false;
+            }
+
+            _canvas = canvas;
+            _safeRoot = safeRoot;
+            _contentRoot = contentRoot;
+            _bannerLayout = bannerLayout;
+            ConfigureCanvas(_canvas);
+            Stretch(_safeRoot);
+            Stretch(_contentRoot);
+            _bannerLayout.Configure(_canvas);
+            return true;
+        }
+
+        private static void ConfigureCanvas(Canvas canvas)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = Camera.main;
+            canvas.planeDistance = 1f;
+
+            var scaler = canvas.GetComponent<CanvasScaler>() ?? canvas.gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(900, 1600);
+            scaler.matchWidthOrHeight = .5f;
+            if (canvas.GetComponent<GraphicRaycaster>() == null) canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        private void EnsureEventSystem()
+        {
+            if (FindFirstObjectByType<EventSystem>() != null) return;
+            var eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            eventSystem.transform.SetParent(transform, false);
         }
 
         private void ShowLoading()

@@ -189,7 +189,7 @@ namespace MonsterLogic.Puzzle
             var report = new ValidationReport();
             if (level == null) { report.errors.Add("Level is null."); return report; }
             int n = level.gridSize;
-            if (n < 6 || n > 11) report.errors.Add("Grid size must be 6 through 11.");
+            if (n < 5 || n > 11) report.errors.Add("Grid size must be 5 through 11.");
             if (level.regionIdByCell == null || level.regionIdByCell.Length != n * n) report.errors.Add("Region cell count is incorrect.");
             if (report.errors.Count > 0) return report;
             var ids = level.regionIdByCell.Distinct().OrderBy(x => x).ToArray();
@@ -262,7 +262,7 @@ namespace MonsterLogic.Puzzle
             throw new InvalidOperationException($"Region generator exhausted level {number} after 240 original candidates.");
         }
 
-        private static int BoardSizeFor(int level) => level <= 45 ? 6 : level <= 100 ? 7 : level <= 160 ? 8 : level <= 215 ? 9 : level <= 235 ? 10 : 11;
+        private static int BoardSizeFor(int level) => level <= 4 ? 5 : level <= 45 ? 6 : level <= 100 ? 7 : level <= 160 ? 8 : level <= 215 ? 9 : level <= 235 ? 10 : 11;
         private static string BandFor(int level) => level <= 10 ? "Tutorial" : level <= 20 ? "Very Easy" : level <= 45 ? "Easy" : level <= 70 ? "Easy+" : level <= 100 ? "Medium" : level <= 130 ? "Medium" : level <= 160 ? "Medium-Hard" : level <= 190 ? "Hard" : level <= 215 ? "Hard+" : level <= 235 ? "Expert" : "Expert+";
         private static DifficultyTier DifficultyFor(int level) => level <= 20 ? DifficultyTier.Tutorial : level <= 70 ? DifficultyTier.Easy : level <= 130 ? DifficultyTier.Medium : level <= 215 ? DifficultyTier.Hard : DifficultyTier.Expert;
         private static string ArchetypeFor(int level)

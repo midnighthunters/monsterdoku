@@ -62,7 +62,7 @@ namespace MonsterLogic.Editor
             return $"FAIL: {errors.Count} campaign validation errors.";
         }
 
-        private static int ExpectedSize(int level) => level <= 45 ? 6 : level <= 100 ? 7 : level <= 160 ? 8 : level <= 215 ? 9 : level <= 235 ? 10 : 11;
+        private static int ExpectedSize(int level) => level <= 4 ? 5 : level <= 45 ? 6 : level <= 100 ? 7 : level <= 160 ? 8 : level <= 215 ? 9 : level <= 235 ? 10 : 11;
     }
 }
 #endif
