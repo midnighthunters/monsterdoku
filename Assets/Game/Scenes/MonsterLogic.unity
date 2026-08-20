@@ -540,6 +540,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   displayFont: {fileID: 11400000, guid: a7ebc88bd847813409198e677ecf2f57, type: 2}
   bodyFont: {fileID: 11400000, guid: b89fe6df207d7d4498486884b2c48e76, type: 2}
+  everytimeMusic: {fileID: 8300000, guid: 92885c293caa9a242bddcdc148e6c40d, type: 3}
+  matchSound: {fileID: 8300000, guid: 41112dd241dbab948866de3b3ae6981f, type: 3}
 --- !u!4 &1605264261
 Transform:
   m_ObjectHideFlags: 0
