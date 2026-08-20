@@ -12,28 +12,31 @@ namespace MonsterLogic.Ads
         public bool adsEnabled = true;
         [Tooltip("Keep false until the publisher confirms this is a general-audience app and completes the privacy review.")]
         public bool generalAudienceAdsApproved;
-        [Tooltip("Enables verbose MAX diagnostics and the in-app Mediation Debugger only in a Unity Development build. Test devices/test mode must still be configured in MAX and AdMob.")]
+        [Tooltip("Enables adapter diagnostics and the in-app LevelPlay test suite only in a Unity Development build. Test devices and test inventory must still be configured in the LevelPlay dashboard and mediated networks.")]
         public bool developmentTestMode;
 
-        [Header("Android MAX ad units")]
-        public string androidRewardedAdUnitId = "REPLACE_ME_ANDROID_MAX_REWARDED";
-        public string androidInterstitialAdUnitId = "REPLACE_ME_ANDROID_MAX_INTERSTITIAL";
-        public string androidBannerAdUnitId = "REPLACE_ME_ANDROID_MAX_BANNER";
+        [Header("Android LevelPlay")]
+        public string androidAppKey = "REPLACE_ME_ANDROID_LEVELPLAY_APP_KEY";
+        public string androidRewardedAdUnitId = "REPLACE_ME_ANDROID_LEVELPLAY_REWARDED";
+        public string androidInterstitialAdUnitId = "REPLACE_ME_ANDROID_LEVELPLAY_INTERSTITIAL";
+        public string androidBannerAdUnitId = "REPLACE_ME_ANDROID_LEVELPLAY_BANNER";
 
-        [Header("iOS MAX ad units")]
-        public string iosRewardedAdUnitId = "REPLACE_ME_IOS_MAX_REWARDED";
-        public string iosInterstitialAdUnitId = "REPLACE_ME_IOS_MAX_INTERSTITIAL";
-        public string iosBannerAdUnitId = "REPLACE_ME_IOS_MAX_BANNER";
+        [Header("iOS LevelPlay")]
+        public string iosAppKey = "REPLACE_ME_IOS_LEVELPLAY_APP_KEY";
+        public string iosRewardedAdUnitId = "REPLACE_ME_IOS_LEVELPLAY_REWARDED";
+        public string iosInterstitialAdUnitId = "REPLACE_ME_IOS_LEVELPLAY_INTERSTITIAL";
+        public string iosBannerAdUnitId = "REPLACE_ME_IOS_LEVELPLAY_BANNER";
 
         [Header("Progression")]
         [Min(1)] public int bannerUnlockCompletedLevel = 3;
         [Min(1)] public int interstitialStartCompletedLevel = 10;
         [Min(1)] public int interstitialEveryNLevelCompletions = 1;
 
-        [Header("Consent flow validation")]
+        [Header("Privacy links")]
         public string privacyPolicyUrl = "REPLACE_ME_HTTPS_PRIVACY_POLICY";
         public string termsOfServiceUrl = "REPLACE_ME_HTTPS_TERMS";
 
+        public string LevelPlayAppKey => SelectPlatform(androidAppKey, iosAppKey);
         public string RewardedAdUnitId => SelectPlatform(androidRewardedAdUnitId, iosRewardedAdUnitId);
         public string InterstitialAdUnitId => SelectPlatform(androidInterstitialAdUnitId, iosInterstitialAdUnitId);
         public string BannerAdUnitId => SelectPlatform(androidBannerAdUnitId, iosBannerAdUnitId);
@@ -47,7 +50,7 @@ namespace MonsterLogic.Ads
 #elif UNITY_IOS && !UNITY_EDITOR
             return FinishRuntimeValidation(GetValidationErrors(false), out reason);
 #else
-            reason = "MAX runtime ads are disabled on this platform.";
+            reason = "LevelPlay runtime ads are disabled on this platform.";
             return false;
 #endif
         }
@@ -64,9 +67,10 @@ namespace MonsterLogic.Ads
             var errors = new List<string>();
             if (!adsEnabled) return errors;
             if (!generalAudienceAdsApproved) errors.Add("generalAudienceAdsApproved is false; publisher audience/privacy review is required.");
-            ValidateId(android ? androidRewardedAdUnitId : iosRewardedAdUnitId, android ? "Android rewarded" : "iOS rewarded", errors);
-            ValidateId(android ? androidInterstitialAdUnitId : iosInterstitialAdUnitId, android ? "Android interstitial" : "iOS interstitial", errors);
-            ValidateId(android ? androidBannerAdUnitId : iosBannerAdUnitId, android ? "Android banner" : "iOS banner", errors);
+            ValidateValue(android ? androidAppKey : iosAppKey, android ? "Android LevelPlay app key" : "iOS LevelPlay app key", errors);
+            ValidateValue(android ? androidRewardedAdUnitId : iosRewardedAdUnitId, android ? "Android rewarded ad unit ID" : "iOS rewarded ad unit ID", errors);
+            ValidateValue(android ? androidInterstitialAdUnitId : iosInterstitialAdUnitId, android ? "Android interstitial ad unit ID" : "iOS interstitial ad unit ID", errors);
+            ValidateValue(android ? androidBannerAdUnitId : iosBannerAdUnitId, android ? "Android banner ad unit ID" : "iOS banner ad unit ID", errors);
             ValidateUrl(privacyPolicyUrl, "Privacy policy", errors);
             ValidateUrl(termsOfServiceUrl, "Terms of service", errors);
             if (bannerUnlockCompletedLevel < 1) errors.Add("Banner unlock level must be at least 1.");
@@ -86,9 +90,9 @@ namespace MonsterLogic.Ads
 #endif
         }
 
-        private static void ValidateId(string value, string label, ICollection<string> errors)
+        private static void ValidateValue(string value, string label, ICollection<string> errors)
         {
-            if (IsPlaceholder(value)) errors.Add(label + " MAX ad unit ID is missing or a placeholder.");
+            if (IsPlaceholder(value)) errors.Add(label + " is missing or a placeholder.");
         }
 
         private static void ValidateUrl(string value, string label, ICollection<string> errors)

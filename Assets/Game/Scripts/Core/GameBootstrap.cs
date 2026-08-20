@@ -9,11 +9,8 @@ namespace MonsterLogic.Core
 {
     public sealed class GameBootstrap : MonoBehaviour
     {
-        [Header("Typography")]
         [SerializeField] private TMP_FontAsset displayFont;
         [SerializeField] private TMP_FontAsset bodyFont;
-
-        [Header("Audio")]
         [SerializeField] private AudioClip everytimeMusic;
         [SerializeField] private AudioClip matchSound;
 
@@ -41,13 +38,13 @@ namespace MonsterLogic.Core
             bool adsReady = adsConfig != null && adsConfig.IsRuntimeReady(out adsDisabledReason);
             if (adsReady)
             {
-                var maxAds = gameObject.AddComponent<MaxAdService>();
-                maxAds.Configure(adsConfig, adPolicy);
-                ads = maxAds;
+                var levelPlayAds = gameObject.AddComponent<LevelPlayAdService>();
+                levelPlayAds.Configure(adsConfig, adPolicy);
+                ads = levelPlayAds;
             }
             else
             {
-                Debug.Log("MAX ads remain disabled: " + adsDisabledReason);
+                Debug.Log("LevelPlay ads remain disabled: " + adsDisabledReason);
             }
 #endif
             var app = gameObject.AddComponent<MonsterLogicApp>();

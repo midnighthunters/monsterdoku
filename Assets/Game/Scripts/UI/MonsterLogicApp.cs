@@ -875,9 +875,9 @@ private void OnCorrectPlacement()
             if (adsConfig != null && Uri.TryCreate(adsConfig.privacyPolicyUrl, UriKind.Absolute, out var privacyUri) && privacyUri.Scheme == Uri.UriSchemeHttps)
                 privacyUrl = privacyUri.AbsoluteUri;
 
-            var maxAds = _ads as MaxAdService;
+            var levelPlayAds = _ads as LevelPlayAdService;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            bool showAdDiagnostics = adsConfig != null && adsConfig.developmentTestMode && maxAds != null && maxAds.IsInitialized;
+            bool showAdDiagnostics = adsConfig != null && adsConfig.developmentTestMode && levelPlayAds != null && levelPlayAds.IsInitialized;
 #else
             bool showAdDiagnostics = false;
 #endif
@@ -918,9 +918,9 @@ private void OnCorrectPlacement()
 
             if (showAdDiagnostics)
             {
-                var diagnostics = Button(sheet, "AdDiagnostics", "OPEN AD DIAGNOSTICS", () => maxAds.ShowMediationDebugger(opened =>
+                var diagnostics = Button(sheet, "AdDiagnostics", "OPEN AD DIAGNOSTICS", () => levelPlayAds.ShowTestSuite(opened =>
                 {
-                    if (!opened) ShowToast("Ad diagnostics are not available yet. Wait for MAX to initialize.");
+                    if (!opened) ShowToast("Ad diagnostics are not available yet. Wait for LevelPlay to initialize.");
                 }), false);
                 Anchor(diagnostics, .5f, .20f, 620, 76);
                 diagnostics.GetComponent<Image>().color = Color.white; diagnostics.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
