@@ -99,7 +99,23 @@ namespace MonsterLogic.Services
             WriteToDisk();
         }
 
-        private void SynchronizeWithPlayerPrefs()
+        #if UNITY_EDITOR
+        // Snapshot only the in-memory save model. Restoring it through WriteToDisk keeps
+        // the editor screenshot gauntlet from changing player progress.
+        public string EditorCaptureSnapshot() => JsonUtility.ToJson(Data, false);
+        public void EditorRestoreSnapshot(string snapshot)
+        {
+            if (string.IsNullOrWhiteSpace(snapshot)) return;
+            var restored = JsonUtility.FromJson<SaveData>(snapshot);
+            if (restored == null) return;
+            Data = restored;
+            EnsurePrefsMarker();
+            WriteToDisk();
+        }
+#endif
+
+        
+private void SynchronizeWithPlayerPrefs()
         {
             if (_data == null || !_data.playerPrefsLinked || PlayerPrefs.HasKey(_prefsMarkerKey)) return;
             ResetSaveData();
