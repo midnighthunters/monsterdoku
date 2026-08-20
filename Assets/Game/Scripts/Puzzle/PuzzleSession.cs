@@ -30,6 +30,7 @@ namespace MonsterLogic.Puzzle
         public event Action Changed;
         public event Action<int> MistakeMade;
         public event Action Completed;
+        public event Action CorrectPlacement;
 
         private readonly Stack<Snapshot> _history = new Stack<Snapshot>();
         private int _hintStage;
@@ -95,7 +96,7 @@ namespace MonsterLogic.Puzzle
             }
             PushSnapshot(); Monsters[cell] = true; PlayerNotes[cell] = false; RebuildAutomaticNotes(); _hintStage = 0;
             IsComplete = PuzzleRules.PlacementsSatisfyAll(Level, Monsters);
-            Changed?.Invoke(); if (IsComplete) Completed?.Invoke();
+            Changed?.Invoke(); CorrectPlacement?.Invoke(); if (IsComplete) Completed?.Invoke();
         }
 
         public void Cycle(int cell)

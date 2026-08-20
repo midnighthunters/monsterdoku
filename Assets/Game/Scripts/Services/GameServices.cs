@@ -274,14 +274,16 @@ private void SynchronizeWithPlayerPrefs()
     public sealed class AudioService
     {
         private readonly SettingsData _settings; private readonly AudioSource _source, _ambience; private readonly Dictionary<string, AudioClip> _clips = new Dictionary<string, AudioClip>();
-        public AudioService(SettingsData settings, GameObject host)
+        private readonly AudioClip _menuMusic, _matchSound;
+        public AudioService(SettingsData settings, GameObject host, AudioClip menuMusic = null, AudioClip matchSound = null)
         {
-            _settings = settings; _source = host.AddComponent<AudioSource>(); _source.playOnAwake = false;
+            _settings = settings; _menuMusic = menuMusic; _matchSound = matchSound; _source = host.AddComponent<AudioSource>(); _source.playOnAwake = false;
             _ambience = host.AddComponent<AudioSource>(); _ambience.playOnAwake = false; _ambience.loop = true; _ambience.volume = .55f;
             _clips["tap"] = CreateTone("tap", 640, .08f, .08f); _clips["x"] = CreateTone("x", 410, .11f, .07f);
             _clips["monster"] = CreateTone("monster", 520, .20f, .10f); _clips["mistake"] = CreateTone("mistake", 180, .25f, .10f);
             _clips["hint"] = CreateTone("hint", 780, .22f, .07f); _clips["panel"] = CreateTone("panel", 330, .12f, .06f);
             _clips["victory"] = CreateChord("victory", new[] { 523f, 659f, 784f }, .75f, .08f);
+            if (_matchSound != null) _clips["match"] = _matchSound;
             _clips["ambience-light"] = CreateAmbient("ambience-light", new[] { 196f, 246.94f, 293.66f });
             _clips["ambience-dark"] = CreateAmbient("ambience-dark", new[] { 130.81f, 196f, 233.08f });
         }
@@ -289,7 +291,7 @@ private void SynchronizeWithPlayerPrefs()
         public void SetAmbience(bool dark)
         {
             if (!_settings.music) { _ambience.Stop(); return; }
-            var clip = _clips[dark ? "ambience-dark" : "ambience-light"];
+            var clip = _menuMusic != null ? _menuMusic : _clips[dark ? "ambience-dark" : "ambience-light"];
             if (_ambience.clip == clip && _ambience.isPlaying) return; _ambience.clip = clip; _ambience.Play();
         }
         private static AudioClip CreateTone(string name, float hz, float seconds, float volume)

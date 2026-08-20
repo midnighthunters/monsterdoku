@@ -21,6 +21,7 @@ namespace MonsterLogic.UI
         private Canvas _canvas; private RectTransform _safeRoot, _contentRoot; private BannerAwareContentLayout _bannerLayout; private GameObject _screen, _toast; private PuzzleSession _session;
         private readonly List<CellView> _cells = new List<CellView>(); private TMP_Text _progress, _hearts, _timer, _hintText;
         private TMP_Text _villainBoosterCount, _hintBoosterCount;
+        private TMP_Text _musicSettingLabel;
         private Image _villainAdBadge, _hintAdBadge;
         private Texture2D _appIcon, _zemoLogo; private GameSceneSpriteSet _gameSprites;
         private Sprite _lockSprite, _activeVillainSprite, _activeCrossSprite, _playAdSprite;
@@ -32,7 +33,7 @@ namespace MonsterLogic.UI
         private const string TermsUrl = "https://zemolabs.com/terms";
         private const string PrivacyUrl = "https://zemolabs.com/privacy";
 
-        public void Initialize(PuzzleLevelDatabase database, SaveService save, IAdService ads, AdPolicy adPolicy, TMP_FontAsset displayFont = null, TMP_FontAsset bodyFont = null)
+public void Initialize(PuzzleLevelDatabase database, SaveService save, IAdService ads, AdPolicy adPolicy, TMP_FontAsset displayFont = null, TMP_FontAsset bodyFont = null, AudioClip menuMusic = null, AudioClip matchSound = null)
         {
             if (_initialized) return;
             _initialized = true;
@@ -44,7 +45,7 @@ namespace MonsterLogic.UI
             _ads.BannerHeightChanged += OnBannerHeightChanged;
             _ads.FullscreenAdWillPresent += PersistSession;
             _theme = ThemeService.Get(_save.Data.settings.darkTheme, _save.Data.settings.colourFriendly);
-            _audio = new AudioService(_save.Data.settings, gameObject);
+            _audio = new AudioService(_save.Data.settings, gameObject, menuMusic, matchSound);
             _haptics = new HapticService(_save.Data.settings);
             _audio.SetAmbience(_save.Data.settings.darkTheme);
             _font = bodyFont != null ? bodyFont : TMP_Settings.defaultFontAsset;
@@ -189,10 +190,13 @@ namespace MonsterLogic.UI
             }
         }
 
-        public void ShowHome()
+public void ShowHome()
         {
             PersistSession(); _session = null; BeginScreen("Home"); AddBackdrop(_screen.transform, Mathf.Max(0, (_save.Data.highestUnlocked - 1) / 25));
             var emblem = RawButton(_screen.transform, "ChapterLogo", _appIcon, ShowLevelSelect); Anchor(emblem, .5f, .72f, 340, 340);
+            var settings = Button(_screen.transform, "Settings", string.Empty, ShowSettings, true);
+            StyleGameSpriteButton(settings, _gameSprites != null ? _gameSprites.SettingsButton : null);
+            Anchor(settings, .91f, .72f, 118, 118);
             var title = Text(_screen.transform, "Title", "monsterdoku", 82, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(title.rectTransform, .5f, .49f, 760, 210);
             bool canContinue = _save.Data.highestUnlocked > 1 && _save.Data.currentLevelId == $"campaign-{_save.Data.highestUnlocked:000}";
             var play = Button(_screen.transform, "Play", canContinue ? $"CONTINUE  ·  LEVEL {_save.Data.highestUnlocked}" : "PLAY", () => StartLevel(_save.Data.highestUnlocked)); Anchor(play, .5f, .30f, 650, 118);
@@ -268,6 +272,7 @@ namespace MonsterLogic.UI
             _session.Changed += OnSessionChanged;
             _session.MistakeMade += OnMistake;
             _session.Completed += OnCompleted;
+            _session.CorrectPlacement += OnCorrectPlacement;
 
             BeginScreen("Game");
             AddGameBackdrop(_screen.transform);
@@ -602,6 +607,12 @@ private IEnumerator PlayLevelEntrance(int levelNumber)
             _audio.Play("mistake"); _haptics.Warning(); var view = _cells[cell]; StartCoroutine(Shake(view.transform as RectTransform));
         }
 
+private void OnCorrectPlacement()
+        {
+            _audio?.Play("match");
+        }
+
+
         private IEnumerator Shake(RectTransform rect)
         {
             var start = rect.anchoredPosition; for (int i = 0; i < 6; i++) { rect.anchoredPosition = start + Vector2.right * (i % 2 == 0 ? 9 : -9); yield return new WaitForSecondsRealtime(.035f); } rect.anchoredPosition = start;
@@ -851,7 +862,7 @@ private IEnumerator PlayLevelEntrance(int levelNumber)
 
         private void ConfirmRestart() => ShowModal("RESTART PUZZLE?", "Your notes and placed villains will be cleared.", "RESTART", RestartCurrentLevel, "KEEP PLAYING", () => { });
 
-        private void ShowSettings()
+private void ShowSettings()
         {
             if (_adBreakActive || GameObject.Find("SettingsOverlay") != null) return;
             var overlay = BeginOverlay("SettingsOverlay", new Color(.05f, .035f, .09f, .76f));
@@ -866,13 +877,23 @@ private IEnumerator PlayLevelEntrance(int levelNumber)
             terms.GetComponent<Image>().color = Color.white; terms.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
             var privacy = Button(sheet, "PrivacyPolicy", "PRIVACY POLICY", () => Application.OpenURL(PrivacyUrl), false); Anchor(privacy, .5f, .35f, 620, 76);
             privacy.GetComponent<Image>().color = Color.white; privacy.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f);
-            var privacyStatus = Text(sheet, "PrivacyStatus", string.Empty, 18, new Color(.66f, .25f, .20f), FontStyles.Bold, TextAlignmentOptions.Center); Anchor(privacyStatus.rectTransform, .5f, .09f, 620, 46);
-            var choices = Button(sheet, "PrivacyChoices", "PRIVACY CHOICES", () =>
-            {
-                _ads.ShowPrivacyOptions(opened => privacyStatus.text = opened ? string.Empty : "Privacy choices are unavailable while ads are disabled.");
-            }, false);
-            choices.GetComponent<Image>().color = Color.white; choices.Find("Label").GetComponent<TMP_Text>().color = new Color(.42f, .27f, .28f); Anchor(choices, .5f, .21f, 620, 76);
+            var music = Button(sheet, "MusicToggle", MusicButtonText(), ToggleMusic, false); Anchor(music, .5f, .21f, 620, 76);
+            music.GetComponent<Image>().color = Color.white;
+            _musicSettingLabel = music.Find("Label").GetComponent<TMP_Text>();
+            _musicSettingLabel.color = new Color(.42f, .27f, .28f);
         }
+
+private string MusicButtonText() => _save != null && _save.Data.settings.music ? "MUSIC · ON" : "MUSIC · OFF";
+
+        private void ToggleMusic()
+        {
+            if (_save == null) return;
+            _save.Data.settings.music = !_save.Data.settings.music;
+            _save.Save();
+            _audio?.SetAmbience(_save.Data.settings.darkTheme);
+            if (_musicSettingLabel != null) _musicSettingLabel.text = MusicButtonText();
+        }
+
 
         private void ShowModal(string title, string body, string primary, Action primaryAction, string secondary, Action secondaryAction)
         {

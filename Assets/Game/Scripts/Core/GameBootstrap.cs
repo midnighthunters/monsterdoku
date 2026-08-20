@@ -13,6 +13,10 @@ namespace MonsterLogic.Core
         [SerializeField] private TMP_FontAsset displayFont;
         [SerializeField] private TMP_FontAsset bodyFont;
 
+        [Header("Audio")]
+        [SerializeField] private AudioClip everytimeMusic;
+        [SerializeField] private AudioClip matchSound;
+
         private void Awake()
         {
             Application.targetFrameRate = 60;
@@ -47,7 +51,7 @@ namespace MonsterLogic.Core
             }
 #endif
             var app = gameObject.AddComponent<MonsterLogicApp>();
-            app.Initialize(database, save, ads, adPolicy, displayFont, bodyFont);
+            app.Initialize(database, save, ads, adPolicy, displayFont, bodyFont, everytimeMusic, matchSound);
             ads.Initialize();
         }
     }
