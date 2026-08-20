@@ -8,3 +8,7 @@
 !Assets/
 !Assets/Game/
 !Assets/Game/**
+
+# Keep repository automation and CI configuration.
+!.github/
+!.github/**
