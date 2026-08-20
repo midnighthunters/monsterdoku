@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42fdaceca5c2af344a1868e97633f331, type: 3}
+  m_Name: GameSceneSpriteSet
+  m_EditorClassIdentifier: 
+  BackButton: {fileID: 0, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  SettingsButton: {fileID: 944779012774039117, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  HeaderPlaque: {fileID: 5352661706397344547, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  StatsPanel: {fileID: 2078564575210527338, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  MonsterIcon: {fileID: 3051202456754674261, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  HourglassIcon: {fileID: -5562620867950904710, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  HeartIcon: {fileID: -1676208682160804821, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  RuleRegion: {fileID: -7543024127633436063, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  RuleRowColumn: {fileID: -8057500313175837543, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  RuleNoTouch: {fileID: 1641582783391472304, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  InstructionStrip: {fileID: 7461868685623435775, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  XButton: {fileID: 2689310901794563193, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  BoosterCircle: {fileID: 2396690058947201085, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  HintButton: {fileID: -8720086974121879271, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  BoosterCountPill: {fileID: 3163535353904526995, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  MummyBoosterAvatar: {fileID: -2494525218603390182, guid: f0d059217247b5e4bbe305224386315c, type: 3}
+  PlayAdIcon: {fileID: 3794550611322748858, guid: 20b6151677931c344983949cc01a4d3d, type: 3}
+  CellBatWatermark: {fileID: 725999315, guid: 4f84083a2ca1e044aac85b04af7ec2e8, type: 3}
+  TombstoneDecoration: {fileID: -1745973131, guid: fef802db3f3fcca4ba6fe8e57c216106, type: 3}
+  Pumpkin: {fileID: 3181465967819354039, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  Candle: {fileID: -9127786802699759967, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  BottomBanner: {fileID: -3920362633657853096, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  PurpleBar: {fileID: -11503756576287529, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
+  YellowStar: {fileID: 4984264110528365645, guid: 022e08d1edea25348a78c08ce9012a3d, type: 3}
