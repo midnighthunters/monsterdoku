@@ -4,10 +4,18 @@
 # Keep this ignore file tracked
 !.gitignore
 
-# Keep Assets/Game and everything inside it
+# Keep all Unity source assets and their .meta files.
+# Generated build output and Unity caches remain ignored by the default rule above.
 !Assets/
-!Assets/Game/
-!Assets/Game/**
+!Assets/**
+
+# Keep the package manifest and lockfile so CI resolves the same dependencies.
+!Packages/
+!Packages/**
+
+# Keep serialized Unity project and iOS Player settings.
+!ProjectSettings/
+!ProjectSettings/**
 
 # Keep repository automation and CI configuration.
 !.github/

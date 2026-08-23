@@ -13,18 +13,18 @@ MonoBehaviour:
   m_Name: AdsConfig
   m_EditorClassIdentifier: 
   adsEnabled: 1
-  generalAudienceAdsApproved: 0
-  developmentTestMode: 0
+  generalAudienceAdsApproved: 1
+  developmentTestMode: 1
   androidAppKey: REPLACE_ME_ANDROID_LEVELPLAY_APP_KEY
   androidRewardedAdUnitId: REPLACE_ME_ANDROID_LEVELPLAY_REWARDED
   androidInterstitialAdUnitId: REPLACE_ME_ANDROID_LEVELPLAY_INTERSTITIAL
   androidBannerAdUnitId: REPLACE_ME_ANDROID_LEVELPLAY_BANNER
-  iosAppKey: REPLACE_ME_IOS_LEVELPLAY_APP_KEY
-  iosRewardedAdUnitId: REPLACE_ME_IOS_LEVELPLAY_REWARDED
-  iosInterstitialAdUnitId: REPLACE_ME_IOS_LEVELPLAY_INTERSTITIAL
-  iosBannerAdUnitId: REPLACE_ME_IOS_LEVELPLAY_BANNER
+  iosAppKey: 27c01420d
+  iosRewardedAdUnitId: lkj3gyl36lpdu3ay
+  iosInterstitialAdUnitId: 61s5lvfssoonyy77
+  iosBannerAdUnitId: b0vewv3pojkfxqnp
   bannerUnlockCompletedLevel: 3
   interstitialStartCompletedLevel: 10
   interstitialEveryNLevelCompletions: 1
-  privacyPolicyUrl: REPLACE_ME_HTTPS_PRIVACY_POLICY
-  termsOfServiceUrl: REPLACE_ME_HTTPS_TERMS
+  privacyPolicyUrl: https://sites.google.com/view/modokupp/home
+  termsOfServiceUrl: https://sites.google.com/view/modokutou/home

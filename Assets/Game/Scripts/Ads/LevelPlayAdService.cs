@@ -39,8 +39,10 @@ namespace MonsterLogic.Ads
         private bool _bannerVisible;
         private int _rewardedRetryAttempt;
         private int _interstitialRetryAttempt;
+        private int _bannerRetryAttempt;
         private Coroutine _rewardedRetry;
         private Coroutine _interstitialRetry;
+        private Coroutine _bannerRetry;
         private bool _previousAudioPause;
         private float _previousAudioVolume;
         private int _lastScreenWidth;
@@ -209,6 +211,7 @@ namespace MonsterLogic.Ads
             StopAllCoroutines();
             _rewardedRetry = null;
             _interstitialRetry = null;
+            _bannerRetry = null;
             _interstitialCompleted = null;
             _rewardedState.CancelWithoutCallback();
             UnsubscribeSdkCallbacks();
@@ -402,11 +405,15 @@ namespace MonsterLogic.Ads
             catch (Exception exception) { Debug.LogWarning("LevelPlay interstitial load failed safely: " + exception.Message); }
         }
 
-        private void LoadBanner()
+private void LoadBanner()
         {
             if (!IsInitialized || _shuttingDown || _bannerAd == null) return;
             try { _bannerAd.LoadAd(); }
-            catch (Exception exception) { Debug.LogWarning("LevelPlay banner load failed safely: " + exception.Message); }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("LevelPlay banner load failed safely: " + exception.Message);
+                ScheduleBannerRetry();
+            }
         }
 
         private bool HasLoadedRewardedAd()
@@ -518,19 +525,38 @@ namespace MonsterLogic.Ads
             InvokeSafely(callback, result);
         }
 
-        private void OnBannerLoaded(LevelPlayAdInfo adInfo)
+private void OnBannerLoaded(LevelPlayAdInfo adInfo)
         {
+            _bannerRetryAttempt = 0;
+            if (_bannerRetry != null) { StopCoroutine(_bannerRetry); _bannerRetry = null; }
             _bannerLoaded = true;
             ApplyBannerVisibility();
             if (_bannerVisible) PublishCurrentBannerHeight();
         }
 
-        private void OnBannerLoadFailed(LevelPlayAdError error)
+private void OnBannerLoadFailed(LevelPlayAdError error)
         {
+            if (_shuttingDown) return;
             _bannerLoaded = false;
             _bannerVisible = false;
             PublishBannerHeight(0f);
+            ScheduleBannerRetry();
         }
+
+private void ScheduleBannerRetry()
+        {
+            if (_shuttingDown || _bannerRetry != null) return;
+            _bannerRetry = StartCoroutine(RetryBannerAfterDelay());
+        }
+
+        private IEnumerator RetryBannerAfterDelay()
+        {
+            _bannerRetryAttempt++;
+            yield return new WaitForSecondsRealtime(Mathf.Pow(2f, Mathf.Min(6, _bannerRetryAttempt)));
+            _bannerRetry = null;
+            LoadBanner();
+        }
+
 
         private void ApplyBannerVisibility()
         {
