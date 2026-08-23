@@ -41,7 +41,7 @@ jobs:
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
       IOS_EXPORT_PATH: ${{ github.workspace }}/Builds/iOS
-      ARCHIVE_PATH: ${{ runner.temp }}/Monsterdoku.xcarchive
+      ARCHIVE_PATH: ${{ github.workspace }}/Builds/archive/Monsterdoku.xcarchive
       EXPORT_PATH: ${{ github.workspace }}/Builds/ipa
     steps:
       - name: Check out source
