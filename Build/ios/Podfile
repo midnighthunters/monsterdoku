@@ -4,7 +4,7 @@ source 'https://cdn.cocoapods.org/'
 platform :ios, '13.0'
 
 target 'UnityFramework' do
-  pod 'IronSourceSDK', '9.6.0.0'
+  pod 'IronSourceSDK', '9.5.0.0'
 end
 target 'Unity-iPhone' do
 end
