@@ -1,8 +1,9 @@
 # Ignore everything by default
 *
 
-# Keep this ignore file tracked
+# Keep repository Git configuration tracked.
 !.gitignore
+!.gitattributes
 
 # Keep all Unity source assets and their .meta files.
 # Generated build output and Unity caches remain ignored by the default rule above.
@@ -20,3 +21,8 @@
 # Keep repository automation and CI configuration.
 !.github/
 !.github/**
+
+# Keep the committed iOS Xcode export so GitHub's macOS runner can archive it directly.
+!Build/
+!Build/ios/
+!Build/ios/**

@@ -1,168 +1,156 @@
-name: Build iOS IPA
+name: Monsterdoku iOS IPA
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Marketing version, for example 1.0.1
+      export_method:
+        description: IPA distribution method
         required: true
+        default: ad-hoc
+        type: choice
+        options: [ad-hoc, app-store]
+      version:
+        description: Optional marketing version, for example 1.0.1
+        required: false
         type: string
       build_number:
-        description: Positive iOS build number, unique in App Store Connect
-        required: true
+        description: Optional positive iOS build number (defaults to the GitHub run number)
+        required: false
         type: string
-      development_build:
-        description: Build as a Unity Development build (allows incomplete ads configuration, but ads remain fail-closed)
-        required: true
-        default: true
-        type: boolean
-      export_method:
-        description: Xcode export method
-        required: true
-        default: development
-        type: choice
-        options:
-          - development
-          - ad-hoc
-          - app-store
 
 permissions:
   contents: read
 
 jobs:
-  build-ipa:
-    name: Export and sign IPA
-    runs-on: [self-hosted, macOS, unity]
+  ipa:
+    name: Archive and export IPA
+    runs-on: macos-15
     timeout-minutes: 90
     env:
-      UNITY_PATH: ${{ vars.MONSTERDOKU_UNITY_PATH }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
-      IOS_EXPORT_PATH: ${{ github.workspace }}/Builds/iOS
-      ARCHIVE_PATH: ${{ github.workspace }}/Builds/archive/Monsterdoku.xcarchive
-      EXPORT_PATH: ${{ github.workspace }}/Builds/ipa
+      IOS_BUNDLE_ID: com.zemolabs.monsterdoku
+      IOS_EXPORT_METHOD: ${{ inputs.export_method }}
+      IOS_MARKETING_VERSION: ${{ inputs.version }}
+      IOS_BUILD_NUMBER: ${{ inputs.build_number }}
+      IOS_PROJECT_PATH: ${{ github.workspace }}/Build/ios
     steps:
-      - name: Check out source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Verify macOS build host
+      - name: Validate committed Xcode project and signing configuration
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$UNITY_PATH" || { echo "Set repository variable MONSTERDOKU_UNITY_PATH to the Unity executable path." >&2; exit 1; }
-          test -x "$UNITY_PATH" || { echo "Unity executable is not available at MONSTERDOKU_UNITY_PATH: $UNITY_PATH" >&2; exit 1; }
-          "$UNITY_PATH" -version | grep -F "6000.0.42f1"
+          test -d "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj"
+          test -f "$IOS_PROJECT_PATH/Info.plist"
           xcodebuild -version
-          command -v pod >/dev/null
-          for secret_name in APPLE_TEAM_ID APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY; do
+          xcodebuild -list -project "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj"
+          for secret_name in APPLE_TEAM_ID APP_STORE_CONNECT_PRIVATE_KEY APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID; do
             test -n "${!secret_name}" || { echo "Missing required secret: $secret_name" >&2; exit 1; }
           done
-
-      - name: Export Unity iOS Xcode project
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf "$IOS_EXPORT_PATH"
-          "$UNITY_PATH" \
-            -batchmode \
-            -quit \
-            -nographics \
-            -projectPath "$GITHUB_WORKSPACE" \
-            -buildTarget iOS \
-            -executeMethod MonsterLogic.Editor.IosCiBuild.Build \
-            -buildPath "$IOS_EXPORT_PATH" \
-            -marketingVersion "${{ inputs.version }}" \
-            -buildNumber "${{ inputs.build_number }}" \
-            -developmentBuild "${{ inputs.development_build }}" \
-            -logFile "$RUNNER_TEMP/unity-ios-build.log"
-
-      - name: Resolve generated CocoaPods dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -f "$IOS_EXPORT_PATH/Podfile" ]]; then
-            pod install --project-directory="$IOS_EXPORT_PATH" --repo-update
-          else
-            echo "No generated Podfile; continuing with the Unity Xcode project."
-          fi
-
-      - name: Archive and export IPA
-        shell: bash
-        run: |
-          set -euo pipefail
-          key_directory="$RUNNER_TEMP/app-store-connect"
-          key_path="$key_directory/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-          mkdir -p "$key_directory"
-          umask 077
-          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
-          trap 'rm -rf "$key_directory"' EXIT
-
-          if [[ -d "$IOS_EXPORT_PATH/Unity-iPhone.xcworkspace" ]]; then
-            container=( -workspace "$IOS_EXPORT_PATH/Unity-iPhone.xcworkspace" )
-          elif [[ -d "$IOS_EXPORT_PATH/Unity-iPhone.xcodeproj" ]]; then
-            container=( -project "$IOS_EXPORT_PATH/Unity-iPhone.xcodeproj" )
-          else
-            echo "Unity did not generate a Unity-iPhone workspace or project." >&2
+          if [[ -n "$IOS_BUILD_NUMBER" && ! "$IOS_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "The iOS build number must be a positive integer; got '$IOS_BUILD_NUMBER'." >&2
             exit 1
           fi
+          if [[ -n "$IOS_MARKETING_VERSION" && ! "$IOS_MARKETING_VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "The marketing version must contain only digits and dots; got '$IOS_MARKETING_VERSION'." >&2
+            exit 1
+          fi
+          grep -Fq "PRODUCT_BUNDLE_IDENTIFIER = $IOS_BUNDLE_ID;" "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj/project.pbxproj"
 
-          rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH"
+      - name: Prepare the committed Xcode project for macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          build="${IOS_BUILD_NUMBER:-$GITHUB_RUN_NUMBER}"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          project = Path("Build/ios/Unity-iPhone.xcodeproj/project.pbxproj")
+          source = project.read_text(encoding="utf-8")
+          patched, replacements = re.subn(r'\s+--usymtool-path=\\".*?\\"', "", source)
+          if replacements != 1:
+              raise SystemExit(
+                  f"Expected one Windows usymtool path in {project}, found {replacements}."
+              )
+          project.write_text(patched, encoding="utf-8")
+          PY
+          if [[ -n "$IOS_MARKETING_VERSION" ]]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $IOS_MARKETING_VERSION" "$IOS_PROJECT_PATH/Info.plist"
+          fi
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build" "$IOS_PROJECT_PATH/Info.plist"
+
+      - name: Resolve CocoaPods dependencies when present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "$IOS_PROJECT_PATH/Podfile" ]]; then
+            pod install --project-directory="$IOS_PROJECT_PATH" --repo-update
+            test -d "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace"
+          fi
+
+      - name: Archive and export signed IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          key_path="$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          archive_path="$RUNNER_TEMP/Monsterdoku.xcarchive"
+          export_path="$RUNNER_TEMP/export"
+          build="${IOS_BUILD_NUMBER:-$GITHUB_RUN_NUMBER}"
+          trap 'rm -f "$key_path"' EXIT
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
+
+          if [[ -d "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace" ]]; then
+            container=( -workspace "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace" )
+          else
+            container=( -project "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj" )
+          fi
+
           xcodebuild archive \
             "${container[@]}" \
             -scheme Unity-iPhone \
             -configuration Release \
             -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$ARCHIVE_PATH" \
+            -destination generic/platform=iOS \
+            -archivePath "$archive_path" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$key_path" \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CURRENT_PROJECT_VERSION="${{ inputs.build_number }}"
+            CURRENT_PROJECT_VERSION="$build" \
+            TARGETED_DEVICE_FAMILY="1,2"
 
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>${{ inputs.export_method }}</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>teamID</key>
-            <string>$APPLE_TEAM_ID</string>
-            <key>stripSwiftSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
+          plutil -create xml1 "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -insert method -string "$IOS_EXPORT_METHOD" "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -insert signingStyle -string automatic "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
           xcodebuild -exportArchive \
-            -archivePath "$ARCHIVE_PATH" \
+            -archivePath "$archive_path" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -exportPath "$EXPORT_PATH" \
+            -exportPath "$export_path" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$key_path" \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
 
-          ipa_path=$(find "$EXPORT_PATH" -maxdepth 1 -type f -name '*.ipa' -print -quit)
-          test -n "$ipa_path" || { echo "No IPA was exported." >&2; exit 1; }
-          unzip -t "$ipa_path" >/dev/null
-          cp "$ipa_path" "$EXPORT_PATH/Monsterdoku.ipa"
+          ipa_path="$(find "$export_path" -maxdepth 1 -type f -name '*.ipa' -print -quit)"
+          test -n "$ipa_path"
+          mkdir -p Builds/ipa
+          cp "$ipa_path" Builds/ipa/Monsterdoku.ipa
+          unzip -t Builds/ipa/Monsterdoku.ipa
 
-      - name: Upload IPA and Unity log
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@v4
         with:
-          name: monsterdoku-ipa-${{ inputs.build_number }}
-          path: |
-            Builds/ipa/Monsterdoku.ipa
-            ${{ runner.temp }}/unity-ios-build.log
+          name: Monsterdoku-ipa-${{ inputs.build_number || github.run_number }}
+          path: Builds/ipa/Monsterdoku.ipa
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
