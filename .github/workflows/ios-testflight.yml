@@ -36,6 +36,16 @@ jobs:
         with:
           lfs: true
 
+      - name: Select Xcode 26 toolchain (Swift 6.2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcode_app="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1)"
+          test -n "$xcode_app" || { echo "No Xcode 26.x found on this runner image; the LevelPlay/IronSource SDK requires the Swift 6.2 runtime." >&2; exit 1; }
+          sudo xcode-select -s "$xcode_app/Contents/Developer"
+          echo "Using $xcode_app"
+          xcodebuild -version
+
       - name: Validate production release and committed Xcode project
         shell: bash
         run: |
