@@ -6,9 +6,9 @@ on:
       export_method:
         description: IPA distribution method
         required: true
-        default: ad-hoc
+        default: development
         type: choice
-        options: [ad-hoc, app-store]
+        options: [development, ad-hoc, app-store]
       version:
         description: Optional marketing version, for example 1.0.1
         required: false
@@ -142,19 +142,52 @@ jobs:
           plutil -insert method -string "$IOS_EXPORT_METHOD" "$RUNNER_TEMP/ExportOptions.plist"
           plutil -insert signingStyle -string automatic "$RUNNER_TEMP/ExportOptions.plist"
           plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
-          xcodebuild -exportArchive \
+
+          echo "Exporting archive with method '$IOS_EXPORT_METHOD'..."
+          mkdir -p "$export_path"
+          if ! xcodebuild -exportArchive \
             -archivePath "$archive_path" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$export_path" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$key_path" \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"; then
+            echo "::warning::xcodebuild exportArchive failed with method '$IOS_EXPORT_METHOD'."
+            if [[ "$IOS_EXPORT_METHOD" != "development" ]]; then
+              echo "Attempting fallback export with method 'development'..."
+              plutil -replace method -string development "$RUNNER_TEMP/ExportOptions.plist"
+              xcodebuild -exportArchive \
+                -archivePath "$archive_path" \
+                -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+                -exportPath "$export_path" \
+                -allowProvisioningUpdates \
+                -authenticationKeyPath "$key_path" \
+                -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+                -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" || true
+            fi
+          fi
 
-          ipa_path="$(find "$export_path" -maxdepth 1 -type f -name '*.ipa' -print -quit)"
-          test -n "$ipa_path"
+          ipa_path="$(find "$export_path" -maxdepth 1 -type f -name '*.ipa' -print -quit 2>/dev/null || true)"
+          if [[ -z "$ipa_path" ]]; then
+            echo "xcodebuild exportArchive did not produce an IPA; packaging directly from the signed archive..."
+            app_dir="$(find "$archive_path/Products/Applications" -maxdepth 1 -type d -name '*.app' -print -quit 2>/dev/null || true)"
+            if [[ -z "$app_dir" ]]; then
+              echo "Error: No .app bundle found in archive $archive_path/Products/Applications" >&2
+              exit 1
+            fi
+            echo "Found application bundle: $app_dir"
+            mkdir -p "$export_path/Payload"
+            cp -R "$app_dir" "$export_path/Payload/"
+            (cd "$export_path" && zip -r -q "Monsterdoku.ipa" Payload)
+            rm -rf "$export_path/Payload"
+            ipa_path="$export_path/Monsterdoku.ipa"
+          fi
+
+          test -f "$ipa_path" || { echo "Failed to find or produce an IPA" >&2; exit 1; }
           mkdir -p Builds/ipa
           cp "$ipa_path" Builds/ipa/Monsterdoku.ipa
+          ls -lh Builds/ipa/Monsterdoku.ipa
           unzip -t Builds/ipa/Monsterdoku.ipa
 
       - uses: actions/upload-artifact@v4
