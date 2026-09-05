@@ -19,8 +19,17 @@ namespace MonsterLogic.Core
             Application.targetFrameRate = 60;
             Screen.orientation = ScreenOrientation.Portrait;
 #if UNITY_EDITOR
-            Screen.SetResolution(900, 1600, false);
+            if (Screen.width > Screen.height)
+            {
+                Screen.SetResolution(900, 1600, false);
+            }
 #endif
+            var cam = Camera.main;
+            if (cam != null && cam.GetComponent<ScreenLetterboxFitter>() == null)
+            {
+                cam.gameObject.AddComponent<ScreenLetterboxFitter>();
+            }
+
             var database = Resources.Load<PuzzleLevelDatabase>("PuzzleLevelDatabase");
             if (database == null)
             {

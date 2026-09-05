@@ -148,7 +148,16 @@ public void Initialize(PuzzleLevelDatabase database, SaveService save, IAdServic
             var scaler = canvas.GetComponent<CanvasScaler>() ?? canvas.gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1080, 1920);
-            scaler.matchWidthOrHeight = .5f;
+
+            var cam = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();
+            var fitter = cam != null ? cam.GetComponent<ScreenLetterboxFitter>() : null;
+            if (fitter == null && cam != null)
+                fitter = cam.gameObject.AddComponent<ScreenLetterboxFitter>();
+            if (fitter != null)
+                fitter.Configure(cam, canvas);
+            else
+                scaler.matchWidthOrHeight = 0f;
+
             if (canvas.GetComponent<GraphicRaycaster>() == null) canvas.gameObject.AddComponent<GraphicRaycaster>();
         }
 
@@ -196,7 +205,7 @@ public void ShowHome()
             var emblem = RawButton(_screen.transform, "ChapterLogo", _appIcon, ShowLevelSelect); Anchor(emblem, .5f, .72f, 340, 340);
             var settings = Button(_screen.transform, "Settings", string.Empty, ShowSettings, true);
             StyleGameSpriteButton(settings, _gameSprites != null ? _gameSprites.SettingsButton : null);
-            Anchor(settings, .91f, .72f, 118, 118);
+            Anchor(settings, .91f, .958f, 118, 118);
             var title = Text(_screen.transform, "Title", "monsterdoku", 82, _theme.ink, FontStyles.Bold, TextAlignmentOptions.Center); Anchor(title.rectTransform, .5f, .49f, 760, 210);
             bool canContinue = _save.Data.highestUnlocked > 1 && _save.Data.currentLevelId == $"campaign-{_save.Data.highestUnlocked:000}";
             var play = Button(_screen.transform, "Play", canContinue ? $"CONTINUE  ·  LEVEL {_save.Data.highestUnlocked}" : "PLAY", () => StartLevel(_save.Data.highestUnlocked)); Anchor(play, .5f, .30f, 650, 118);
