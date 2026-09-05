@@ -278,6 +278,22 @@ extern void SafeAreaFitter_OnEnable_m82E38BE9102225BC922BC502F639000C6E08FD1F (v
 extern void SafeAreaFitter_Update_m1322746352591B21F7F6E03965F27B190010771D (void);
 extern void SafeAreaFitter_Apply_mD9FBE9813B46F0D9018C83685271B622DE6009D3 (void);
 extern void SafeAreaFitter__ctor_m927E7A6D00C76DF16F4A95EC4FD9C960711ED4C1 (void);
+extern void ScreenLetterboxFitter_get_TargetAspectRatio_m35D41C00B8C80CD9007B99552662DE339703A4A6 (void);
+extern void ScreenLetterboxFitter_get_BackgroundCamera_mC1AB92E29EC39AAEA5E2BA593F9E3FA8C06892E7 (void);
+extern void ScreenLetterboxFitter_get_MainCamera_mFA1EB1935CF7A847974C42C271A23480728B0676 (void);
+extern void ScreenLetterboxFitter_get_Instance_mB64E3EE824D78A683831A9C429883477F9E54627 (void);
+extern void ScreenLetterboxFitter_set_Instance_m2640FAA9BEBFA35FB623B02FF6463DE72C42AAA4 (void);
+extern void ScreenLetterboxFitter_Awake_mCA60EA819A1475333FCCDE117EF5580DD6DC3194 (void);
+extern void ScreenLetterboxFitter_OnEnable_m0F3C724A6B62E20CF9A25ED1680ACCB9E644D0A4 (void);
+extern void ScreenLetterboxFitter_Update_mD351B46EC284EF7A65E1F8E3FC3CB4AEC038AAFF (void);
+extern void ScreenLetterboxFitter_LateUpdate_mD144DE9698641632E121214AEC267261FEFAD14C (void);
+extern void ScreenLetterboxFitter_Configure_mEDB39FA85D0CDF2657CD23C7F4579799AC13563F (void);
+extern void ScreenLetterboxFitter_Apply_m400A41F7E0D58E7F4ADF6DC8D3E28D0EC1E60BB4 (void);
+extern void ScreenLetterboxFitter_ResolveReferences_m1B0CEB58CD7EECA6408091A4841088D9AD0ECA2E (void);
+extern void ScreenLetterboxFitter_EnsureBackgroundCamera_m0F3211BEB733B65E916A6A45C5D2D45428C04A52 (void);
+extern void ScreenLetterboxFitter_OnDisable_m13C456588C1F429311CDFCC38A180CDDFC2AE340 (void);
+extern void ScreenLetterboxFitter_OnDestroy_m28D0173EE1E3D75C314350FD424BAD9CBD05A93B (void);
+extern void ScreenLetterboxFitter__ctor_mD49641BF44346558CDDDA15518BF1384D46993BC (void);
 extern void LevelResult__ctor_m0DD3F63BC485E0769CC287EAD6F41748EE9FBA53 (void);
 extern void SettingsData__ctor_mDED74BE4B0F3B3477D480F03218CB99EB8CDA323 (void);
 extern void SaveData__ctor_m8A63371A7902DDC5DABD331B2C1AD1AAFC99D75A (void);
@@ -626,7 +642,7 @@ extern void RewardedAdStateMachine_CompleteDisplayFailed_m081ACD9557474E0E034860
 extern void RewardedAdStateMachine_CancelWithoutCallback_m684F1FD40FB58E182BA68D46A07C2644DEF8380A (void);
 extern void RewardedAdStateMachine_Complete_m26F28A73A983E11C06C81BEABFD17BAF279DBBAD (void);
 extern void RewardedAdStateMachine__ctor_m33DE5875137ECB47530C70ED93A7342E2D814211 (void);
-static Il2CppMethodPointer s_methodPointers[640] = 
+static Il2CppMethodPointer s_methodPointers[656] = 
 {
 	UnitySourceGeneratedAssemblyMonoScriptTypes_v1_Get_mBEB95BEB954BB63E9710BBC7AD5E78C4CB0A0033,
 	UnitySourceGeneratedAssemblyMonoScriptTypes_v1__ctor_mE70FB23ACC1EA12ABC948AA22C2E78B2D0AA39B1,
@@ -899,6 +915,22 @@ static Il2CppMethodPointer s_methodPointers[640] =
 	SafeAreaFitter_Update_m1322746352591B21F7F6E03965F27B190010771D,
 	SafeAreaFitter_Apply_mD9FBE9813B46F0D9018C83685271B622DE6009D3,
 	SafeAreaFitter__ctor_m927E7A6D00C76DF16F4A95EC4FD9C960711ED4C1,
+	ScreenLetterboxFitter_get_TargetAspectRatio_m35D41C00B8C80CD9007B99552662DE339703A4A6,
+	ScreenLetterboxFitter_get_BackgroundCamera_mC1AB92E29EC39AAEA5E2BA593F9E3FA8C06892E7,
+	ScreenLetterboxFitter_get_MainCamera_mFA1EB1935CF7A847974C42C271A23480728B0676,
+	ScreenLetterboxFitter_get_Instance_mB64E3EE824D78A683831A9C429883477F9E54627,
+	ScreenLetterboxFitter_set_Instance_m2640FAA9BEBFA35FB623B02FF6463DE72C42AAA4,
+	ScreenLetterboxFitter_Awake_mCA60EA819A1475333FCCDE117EF5580DD6DC3194,
+	ScreenLetterboxFitter_OnEnable_m0F3C724A6B62E20CF9A25ED1680ACCB9E644D0A4,
+	ScreenLetterboxFitter_Update_mD351B46EC284EF7A65E1F8E3FC3CB4AEC038AAFF,
+	ScreenLetterboxFitter_LateUpdate_mD144DE9698641632E121214AEC267261FEFAD14C,
+	ScreenLetterboxFitter_Configure_mEDB39FA85D0CDF2657CD23C7F4579799AC13563F,
+	ScreenLetterboxFitter_Apply_m400A41F7E0D58E7F4ADF6DC8D3E28D0EC1E60BB4,
+	ScreenLetterboxFitter_ResolveReferences_m1B0CEB58CD7EECA6408091A4841088D9AD0ECA2E,
+	ScreenLetterboxFitter_EnsureBackgroundCamera_m0F3211BEB733B65E916A6A45C5D2D45428C04A52,
+	ScreenLetterboxFitter_OnDisable_m13C456588C1F429311CDFCC38A180CDDFC2AE340,
+	ScreenLetterboxFitter_OnDestroy_m28D0173EE1E3D75C314350FD424BAD9CBD05A93B,
+	ScreenLetterboxFitter__ctor_mD49641BF44346558CDDDA15518BF1384D46993BC,
 	LevelResult__ctor_m0DD3F63BC485E0769CC287EAD6F41748EE9FBA53,
 	SettingsData__ctor_mDED74BE4B0F3B3477D480F03218CB99EB8CDA323,
 	SaveData__ctor_m8A63371A7902DDC5DABD331B2C1AD1AAFC99D75A,
@@ -1279,16 +1311,16 @@ extern void VillainTier_get_AcknowledgementId_m1ADCC7400939AE932B2A217CE0BC90FDA
 extern void VillainTier_get_LevelRangeLabel_mAC9758FD1DE92EB8EB2023324A7CDB49A7D0D9F9_AdjustorThunk (void);
 static Il2CppTokenAdjustorThunkPair s_adjustorThunks[8] = 
 {
-	{ 0x06000130, AdRevenueEvent__ctor_m23DA3DE6FCBA4283AEE3517398C826E6AAAB7F2B_AdjustorThunk },
-	{ 0x06000164, ThemePalette__ctor_m43E6A6027E70BB06DFC5BD0D507F73EF0FA3C72B_AdjustorThunk },
-	{ 0x060001FA, VillainDefinition__ctor_mEC3C39D132DAB582BE56DB00049F976493055FB2_AdjustorThunk },
-	{ 0x060001FB, VillainTier__ctor_m82CC38630E9CB6E846FAEA2AF793F0E159BFDE09_AdjustorThunk },
-	{ 0x060001FC, VillainTier_get_LevelProgress_m3D0AA99CAAEA1252659FB95372FE84DA0D6B1443_AdjustorThunk },
-	{ 0x060001FD, VillainTier_get_IsFirstLevel_m07C34319E051C2855E0176B9BC5493F603875621_AdjustorThunk },
-	{ 0x060001FE, VillainTier_get_AcknowledgementId_m1ADCC7400939AE932B2A217CE0BC90FDAB2F3111_AdjustorThunk },
-	{ 0x060001FF, VillainTier_get_LevelRangeLabel_mAC9758FD1DE92EB8EB2023324A7CDB49A7D0D9F9_AdjustorThunk },
+	{ 0x06000140, AdRevenueEvent__ctor_m23DA3DE6FCBA4283AEE3517398C826E6AAAB7F2B_AdjustorThunk },
+	{ 0x06000174, ThemePalette__ctor_m43E6A6027E70BB06DFC5BD0D507F73EF0FA3C72B_AdjustorThunk },
+	{ 0x0600020A, VillainDefinition__ctor_mEC3C39D132DAB582BE56DB00049F976493055FB2_AdjustorThunk },
+	{ 0x0600020B, VillainTier__ctor_m82CC38630E9CB6E846FAEA2AF793F0E159BFDE09_AdjustorThunk },
+	{ 0x0600020C, VillainTier_get_LevelProgress_m3D0AA99CAAEA1252659FB95372FE84DA0D6B1443_AdjustorThunk },
+	{ 0x0600020D, VillainTier_get_IsFirstLevel_m07C34319E051C2855E0176B9BC5493F603875621_AdjustorThunk },
+	{ 0x0600020E, VillainTier_get_AcknowledgementId_m1ADCC7400939AE932B2A217CE0BC90FDAB2F3111_AdjustorThunk },
+	{ 0x0600020F, VillainTier_get_LevelRangeLabel_mAC9758FD1DE92EB8EB2023324A7CDB49A7D0D9F9_AdjustorThunk },
 };
-static const int32_t s_InvokerIndices[640] = 
+static const int32_t s_InvokerIndices[656] = 
 {
 	24517,
 	14009,
@@ -1557,6 +1589,22 @@ static const int32_t s_InvokerIndices[640] =
 	15770,
 	16757,
 	14748,
+	14009,
+	14009,
+	14009,
+	14009,
+	13895,
+	13796,
+	13796,
+	24411,
+	23258,
+	14009,
+	14009,
+	14009,
+	14009,
+	5276,
+	14009,
+	14009,
 	14009,
 	14009,
 	14009,
@@ -1933,7 +1981,7 @@ static const int32_t s_InvokerIndices[640] =
 };
 static const Il2CppTokenRangePair s_rgctxIndices[1] = 
 {
-	{ 0x0600025F, { 0, 3 } },
+	{ 0x0600026F, { 0, 3 } },
 };
 extern const uint32_t g_rgctx_Action_1_t944D1948E8C64D0EE51D2C518CA3996C333070B7;
 extern const uint32_t g_rgctx_T_tF157B2BB7E1D59239D6B825E667267AE40D5BC99;
@@ -1948,7 +1996,7 @@ IL2CPP_EXTERN_C const Il2CppCodeGenModule g_AssemblyU2DCSharp_CodeGenModule;
 const Il2CppCodeGenModule g_AssemblyU2DCSharp_CodeGenModule = 
 {
 	"Assembly-CSharp.dll",
-	640,
+	656,
 	s_methodPointers,
 	8,
 	s_adjustorThunks,

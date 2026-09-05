@@ -1214,6 +1214,14 @@ void RegisterAllStrippedInternalCalls()
 		void Register_UnityEngine_Camera_get_worldToCameraMatrix_Injected();
 		Register_UnityEngine_Camera_get_worldToCameraMatrix_Injected();
 
+		//System.Void UnityEngine.Camera::set_allowHDR_Injected(System.IntPtr,System.Boolean)
+		void Register_UnityEngine_Camera_set_allowHDR_Injected();
+		Register_UnityEngine_Camera_set_allowHDR_Injected();
+
+		//System.Void UnityEngine.Camera::set_allowMSAA_Injected(System.IntPtr,System.Boolean)
+		void Register_UnityEngine_Camera_set_allowMSAA_Injected();
+		Register_UnityEngine_Camera_set_allowMSAA_Injected();
+
 		//System.Void UnityEngine.Camera::set_backgroundColor_Injected(System.IntPtr,UnityEngine.Color&)
 		void Register_UnityEngine_Camera_set_backgroundColor_Injected();
 		Register_UnityEngine_Camera_set_backgroundColor_Injected();
@@ -1222,9 +1230,17 @@ void RegisterAllStrippedInternalCalls()
 		void Register_UnityEngine_Camera_set_clearFlags_Injected();
 		Register_UnityEngine_Camera_set_clearFlags_Injected();
 
+		//System.Void UnityEngine.Camera::set_cullingMask_Injected(System.IntPtr,System.Int32)
+		void Register_UnityEngine_Camera_set_cullingMask_Injected();
+		Register_UnityEngine_Camera_set_cullingMask_Injected();
+
 		//System.Void UnityEngine.Camera::set_depthTextureMode_Injected(System.IntPtr,UnityEngine.DepthTextureMode)
 		void Register_UnityEngine_Camera_set_depthTextureMode_Injected();
 		Register_UnityEngine_Camera_set_depthTextureMode_Injected();
+
+		//System.Void UnityEngine.Camera::set_depth_Injected(System.IntPtr,System.Single)
+		void Register_UnityEngine_Camera_set_depth_Injected();
+		Register_UnityEngine_Camera_set_depth_Injected();
 
 		//System.Void UnityEngine.Camera::set_fieldOfView_Injected(System.IntPtr,System.Single)
 		void Register_UnityEngine_Camera_set_fieldOfView_Injected();

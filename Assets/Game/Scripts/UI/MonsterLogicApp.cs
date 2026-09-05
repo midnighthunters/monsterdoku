@@ -1077,8 +1077,10 @@ private string MusicButtonText() => _save != null && _save.Data.settings.music ?
             {
                 float x = .06f + (i * .137f) % .87f;
                 float y = .17f + (i * .213f) % .72f;
+                if (i == 0) continue; // Skip star appearing just below the puzzle grid
                 if (i % 3 == 0 && _gameSprites != null && _gameSprites.YellowStar != null)
                 {
+                    if (y < 0.25f) continue;
                     var star = SpritePanel(parent, $"Star_{i}", _gameSprites.YellowStar, new Color(1f, .87f, 1f, .68f));
                     Anchor(star, x, y, 28, 28);
                 }
