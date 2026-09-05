@@ -1,0 +1,76 @@
+name: Diagnose Apple Signing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: pip install pyjwt cryptography requests
+
+      - name: Query App Store Connect API
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          python3 - <<'PY'
+          import os, sys, time, json, jwt, requests
+
+          key_id = os.environ.get("KEY_ID", "").strip()
+          issuer_id = os.environ.get("ISSUER_ID", "").strip()
+          private_key = os.environ.get("PRIVATE_KEY", "").strip()
+          team_id = os.environ.get("TEAM_ID", "").strip()
+
+          print(f"Key ID: {key_id[:4]}... (len {len(key_id)})")
+          print(f"Issuer ID: {issuer_id[:4]}... (len {len(issuer_id)})")
+          print(f"Team ID: {team_id}")
+          print(f"Private Key present: {bool(private_key)} (len {len(private_key)})")
+
+          header = {"alg": "ES256", "kid": key_id, "typ": "JWT"}
+          payload = {
+              "iss": issuer_id,
+              "iat": int(time.time()),
+              "exp": int(time.time()) + 1200,
+              "aud": "appstoreconnect-v1"
+          }
+
+          try:
+              token = jwt.encode(payload, private_key, algorithm="ES256", headers=header)
+          except Exception as e:
+              print(f"JWT generation error: {e}")
+              sys.exit(1)
+
+          headers = {"Authorization": f"Bearer {token}"}
+          base_url = "https://api.appstoreconnect.apple.com/v1"
+
+          def check_endpoint(name, path):
+              print(f"\n--- Checking {name} ({path}) ---")
+              try:
+                  r = requests.get(f"{base_url}/{path}", headers=headers)
+                  print(f"Status: {r.status_code}")
+                  if r.status_code == 200:
+                      data = r.json().get("data", [])
+                      print(f"Found {len(data)} items:")
+                      for item in data:
+                          attrs = item.get("attributes", {})
+                          item_type = item.get("type")
+                          item_id = item.get("id")
+                          print(f"  - [{item_type}] id={item_id}: {json.dumps(attrs, indent=4)}")
+                  else:
+                      print(f"Response: {r.text[:500]}")
+              except Exception as e:
+                  print(f"Error checking {name}: {e}")
+
+          check_endpoint("Certificates", "certificates")
+          check_endpoint("Bundle IDs", "bundleIds")
+          check_endpoint("Profiles", "profiles")
+          check_endpoint("Devices", "devices")
+          check_endpoint("Apps", "apps")
+          PY
