@@ -1,0 +1,63 @@
+version: 2.1
+
+executors:
+  macos-ios:
+    macos:
+      xcode: 16.2.0
+    resource_class: m4pro.medium
+
+jobs:
+  build_ios:
+    executor: macos-ios
+    parameters:
+      ipa_export_method:
+        type: string
+        default: development
+    environment:
+      IOS_BUILD_PATH: "Build/ios"
+      IOS_BUNDLE_ID: "com.zemolabs.monsterdoku"
+      IPA_EXPORT_METHOD: << parameters.ipa_export_method >>
+    steps:
+      - checkout
+      - run:
+          name: Build signed iOS IPA
+          command: bash ci/ios/build-ipa.sh
+      - store_artifacts:
+          path: build-artifacts
+          destination: ios
+
+  deploy_testflight:
+    executor: macos-ios
+    parameters:
+      version:
+        type: string
+        default: ""
+      build_number:
+        type: string
+        default: ""
+    environment:
+      IOS_BUILD_PATH: "Build/ios"
+      IOS_BUNDLE_ID: "com.zemolabs.monsterdoku"
+      IPA_EXPORT_METHOD: "app-store"
+      MARKETING_VERSION: << parameters.version >>
+      REQUESTED_BUILD_NUMBER: << parameters.build_number >>
+    steps:
+      - checkout
+      - run:
+          name: Build and deploy to TestFlight
+          command: bash ci/ios/deploy-testflight.sh
+      - store_artifacts:
+          path: build-artifacts
+          destination: ios
+
+workflows:
+  ios_ipa:
+    jobs:
+      - build_ios
+
+  testflight_deploy:
+    jobs:
+      - deploy_testflight:
+          filters:
+            tags:
+              only: /^v.*/

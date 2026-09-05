@@ -21,6 +21,21 @@
 # Keep repository automation and CI configuration.
 !.github/
 !.github/**
+!.circleci/
+!.circleci/**
+!ci/
+!ci/**
+!docs/
+!docs/**
+
+# Never commit private signing files or build outputs
+*.p12
+*.mobileprovision
+*.p8
+*.pem
+build-artifacts/
+Builds/
+!Builds/
 
 # Keep the committed iOS Xcode export so GitHub's macOS runner can archive it directly.
 !Build/

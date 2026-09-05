@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Marketing version, for example 1.0.1
-        required: true
+        description: Optional marketing version, for example 1.0.1 (defaults to Info.plist version)
+        required: false
         type: string
       build_number:
         description: Optional positive iOS build number (defaults to the GitHub run number)
@@ -22,13 +22,15 @@ jobs:
   testflight:
     name: Archive and upload production IPA
     runs-on: macos-15
-    environment: testflight
     timeout-minutes: 90
     env:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
       IOS_BUNDLE_ID: com.zemolabs.monsterdoku
       IOS_PROJECT_PATH: ${{ github.workspace }}/Build/ios
     steps:
@@ -57,8 +59,11 @@ jobs:
             version="${GITHUB_REF_NAME#v}"
             requested_build_number=""
           fi
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "Production versions must be SemVer (for example, 1.2.3 or tag v1.2.3); got '$version'." >&2
+          if [[ -z "$version" ]]; then
+            version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$IOS_PROJECT_PATH/Info.plist" 2>/dev/null || echo '1.0.0')"
+          fi
+          [[ "$version" =~ ^[0-9]+(\.[0-9]+)*$ ]] || {
+            echo "Production versions must contain only digits and dots; got '$version'." >&2
             exit 1
           }
           build_number="${requested_build_number:-$GITHUB_RUN_NUMBER}"
@@ -72,7 +77,7 @@ jobs:
           xcodebuild -list -project "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj"
           command -v xcrun >/dev/null
           for secret_name in APPLE_TEAM_ID APP_STORE_CONNECT_PRIVATE_KEY APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID; do
-            test -n "${!secret_name}" || { echo "Missing required protected-environment secret: $secret_name" >&2; exit 1; }
+            test -n "${!secret_name}" || { echo "Missing required secret: $secret_name" >&2; exit 1; }
           done
           grep -Fq "PRODUCT_BUNDLE_IDENTIFIER = $IOS_BUNDLE_ID;" "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj/project.pbxproj"
           printf 'IOS_MARKETING_VERSION=%s\nIOS_BUILD_NUMBER=%s\n' "$version" "$build_number" >> "$GITHUB_ENV"
@@ -123,39 +128,93 @@ jobs:
             container=( -project "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj" )
           fi
 
-          xcodebuild archive \
-            "${container[@]}" \
-            -scheme Unity-iPhone \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination generic/platform=iOS \
-            -archivePath "$archive_path" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$key_path" \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
-            TARGETED_DEVICE_FAMILY="1,2"
+          if [[ -n "$IOS_CERTIFICATE_BASE64" && -n "$IOS_PROVISIONING_PROFILE_BASE64" ]]; then
+            echo "Configuring manual code signing with imported .p12 certificate and provisioning profile..."
+            keychain_path="$RUNNER_TEMP/ci-signing.keychain-db"
+            keychain_password="${IOS_CERTIFICATE_PASSWORD:-circleci}"
+            cert_path="$RUNNER_TEMP/ios-dist.p12"
+            profile_path="$RUNNER_TEMP/ci.mobileprovision"
+            profile_plist="$RUNNER_TEMP/ci.mobileprovision.plist"
 
-          plutil -create xml1 "$RUNNER_TEMP/ExportOptions.plist"
-          plutil -insert method -string app-store "$RUNNER_TEMP/ExportOptions.plist"
-          plutil -insert signingStyle -string automatic "$RUNNER_TEMP/ExportOptions.plist"
-          plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
-          xcodebuild -exportArchive \
-            -archivePath "$archive_path" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -exportPath "$export_path" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$key_path" \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+            printf '%s' "$IOS_CERTIFICATE_BASE64" | base64 -D > "$cert_path"
+            printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -D > "$profile_path"
+
+            security create-keychain -p "$keychain_password" "$keychain_path"
+            security set-keychain-settings -lut 21600 "$keychain_path"
+            security unlock-keychain -p "$keychain_password" "$keychain_path"
+            security import "$cert_path" -k "$keychain_path" -P "$keychain_password" -T /usr/bin/codesign -T /usr/bin/security
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
+            security list-keychains -d user -s "$keychain_path" "${HOME}/Library/Keychains/login.keychain-db"
+
+            security cms -D -i "$profile_path" > "$profile_plist"
+            profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$profile_plist")"
+            profile_name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$profile_plist")"
+            mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+            cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/${profile_uuid}.mobileprovision"
+
+            xcodebuild archive \
+              "${container[@]}" \
+              -scheme Unity-iPhone \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination generic/platform=iOS \
+              -archivePath "$archive_path" \
+              CODE_SIGN_STYLE=Manual \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              PROVISIONING_PROFILE="$profile_uuid" \
+              PROVISIONING_PROFILE_SPECIFIER="$profile_name" \
+              CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
+              TARGETED_DEVICE_FAMILY="1,2"
+
+            plutil -create xml1 "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert method -string app-store "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert signingStyle -string manual "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert provisioningProfiles -dictionary "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert "provisioningProfiles.$IOS_BUNDLE_ID" -string "$profile_name" "$RUNNER_TEMP/ExportOptions.plist"
+
+            xcodebuild -exportArchive \
+              -archivePath "$archive_path" \
+              -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+              -exportPath "$export_path"
+          else
+            echo "Using automatic App Store Connect API Key signing..."
+            xcodebuild archive \
+              "${container[@]}" \
+              -scheme Unity-iPhone \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination generic/platform=iOS \
+              -archivePath "$archive_path" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath "$key_path" \
+              -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+              -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+              CODE_SIGN_STYLE=Automatic \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
+              TARGETED_DEVICE_FAMILY="1,2"
+
+            plutil -create xml1 "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert method -string app-store "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert signingStyle -string automatic "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
+
+            xcodebuild -exportArchive \
+              -archivePath "$archive_path" \
+              -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+              -exportPath "$export_path" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath "$key_path" \
+              -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+              -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+          fi
 
           ipa_path="$(find "$export_path" -maxdepth 1 -type f -name '*.ipa' -print -quit)"
           test -n "$ipa_path"
           mkdir -p Builds/ipa
           cp "$ipa_path" Builds/ipa/Monsterdoku.ipa
+          ls -lh Builds/ipa/Monsterdoku.ipa
           unzip -t Builds/ipa/Monsterdoku.ipa
 
       - uses: actions/upload-artifact@v4
@@ -166,18 +225,36 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-      - name: Upload IPA to App Store Connect
+      - name: Upload IPA to App Store Connect / TestFlight
         shell: bash
         run: |
           set -euo pipefail
-          key_directory="$HOME/.appstoreconnect/private_keys"
-          key_path="$key_directory/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-          mkdir -p "$key_directory"
-          umask 077
-          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
-          trap 'rm -f "$key_path"' EXIT
-          xcrun iTMSTransporter \
-            -m upload \
-            -assetFile "$GITHUB_WORKSPACE/Builds/ipa/Monsterdoku.ipa" \
-            -apiKey "$APP_STORE_CONNECT_KEY_ID" \
-            -apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          key_dirs=(
+            "$HOME/.appstoreconnect/private_keys"
+            "$HOME/.private_keys"
+          )
+          for kd in "${key_dirs[@]}"; do
+            mkdir -p "$kd"
+            key_path="$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+            printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
+            chmod 600 "$key_path"
+          done
+          trap 'for kd in "${key_dirs[@]}"; do rm -f "$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" 2>/dev/null || true; done' EXIT
+
+          ipa_path="$GITHUB_WORKSPACE/Builds/ipa/Monsterdoku.ipa"
+          echo "Uploading $ipa_path to TestFlight using xcrun altool..."
+          if xcrun altool --upload-app \
+            --type ios \
+            --file "$ipa_path" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"; then
+            echo "=== TestFlight upload successful via altool! ==="
+          else
+            echo "Warning: altool upload returned an error; attempting fallback upload with iTMSTransporter..."
+            xcrun iTMSTransporter \
+              -m upload \
+              -assetFile "$ipa_path" \
+              -apiKey "$APP_STORE_CONNECT_KEY_ID" \
+              -apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+            echo "=== TestFlight upload successful via iTMSTransporter! ==="
+          fi
