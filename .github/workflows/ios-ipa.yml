@@ -104,6 +104,14 @@ jobs:
             test -d "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace"
           fi
 
+      - name: Prune orphaned CI development certificates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/cert-venv"
+          "$RUNNER_TEMP/cert-venv/bin/pip" install --quiet pyjwt cryptography requests
+          "$RUNNER_TEMP/cert-venv/bin/python" ci/ios/prune-ci-certs.py
+
       - name: Archive and export signed IPA
         shell: bash
         run: |

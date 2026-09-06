@@ -129,6 +129,20 @@ elif [[ -n "${APP_STORE_CONNECT_PRIVATE_KEY:-}" && -n "${APP_STORE_CONNECT_KEY_I
   key_path="$temp_directory/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
   printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
 
+  # Prune orphaned CI-generated development certificates before Xcode requests a new one
+  if [[ -f "$project_root/ci/ios/prune-ci-certs.py" ]]; then
+    echo "Pruning orphaned CI development certificates from App Store Connect..."
+    if ! python3 -c "import jwt, requests" >/dev/null 2>&1; then
+      python3 -m venv "$temp_directory/cert-venv" 2>/dev/null || true
+      if [[ -f "$temp_directory/cert-venv/bin/pip" ]]; then
+        "$temp_directory/cert-venv/bin/pip" install --quiet pyjwt cryptography requests 2>/dev/null || true
+        "$temp_directory/cert-venv/bin/python" "$project_root/ci/ios/prune-ci-certs.py" || true
+      fi
+    else
+      python3 "$project_root/ci/ios/prune-ci-certs.py" || true
+    fi
+  fi
+
   echo "Archiving project..."
   xcodebuild archive \
     "${xcode_container[@]}" \

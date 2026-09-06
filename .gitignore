@@ -33,6 +33,8 @@
 *.mobileprovision
 *.p8
 *.pem
+__pycache__/
+*.pyc
 build-artifacts/
 Builds/
 !Builds/
