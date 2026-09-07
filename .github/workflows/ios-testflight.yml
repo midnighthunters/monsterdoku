@@ -184,14 +184,7 @@ jobs:
           archive_path="$RUNNER_TEMP/Monsterdoku.xcarchive"
           export_path="$RUNNER_TEMP/export"
           trap 'rm -f "$key_path"' EXIT
-          python3 - <<'PY'
-          import os
-          k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
-          if "\\n" in k and "-----BEGIN" in k:
-              k = k.replace("\\n", "\n")
-          with open(os.environ["RUNNER_TEMP"] + f"/AuthKey_{os.environ['APP_STORE_CONNECT_KEY_ID']}.p8", "w") as f:
-              f.write(k.strip() + "\n")
-          PY
+          python3 -c "import os; k = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY', '').replace('\\\\n', '\n').strip(); open(os.environ['RUNNER_TEMP'] + f\"/AuthKey_{os.environ['APP_STORE_CONNECT_KEY_ID']}.p8\", 'w').write(k + '\n')"
           chmod 600 "$key_path"
 
           if [[ -d "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace" ]]; then
@@ -242,22 +235,8 @@ jobs:
               TARGETED_DEVICE_FAMILY="1,2"
 
             export profile_name
-            python3 - <<'PY'
-            import os, plistlib
-            options = {
-                "method": "app-store",
-                "signingStyle": "manual",
-                "teamID": os.environ["APPLE_TEAM_ID"],
-                "manageAppVersionAndBuildNumber": False,
-                "stripSwiftSymbols": True,
-                "uploadSymbols": True,
-                "provisioningProfiles": {
-                    os.environ["IOS_BUNDLE_ID"]: os.environ["profile_name"]
-                }
-            }
-            with open(os.environ["RUNNER_TEMP"] + "/ExportOptions.plist", "wb") as f:
-                plistlib.dump(options, f)
-            PY
+            python3 -c "import os, plistlib; options = {'method': 'app-store', 'signingStyle': 'manual', 'signingCertificate': 'Apple Distribution', 'teamID': os.environ['APPLE_TEAM_ID'], 'manageAppVersionAndBuildNumber': False, 'stripSwiftSymbols': True, 'uploadSymbols': True, 'provisioningProfiles': {os.environ['IOS_BUNDLE_ID']: os.environ['profile_name']}}; open(os.environ['RUNNER_TEMP'] + '/ExportOptions.plist', 'wb').write(plistlib.dumps(options))"
+
 
             echo "Exporting App Store IPA..."
             xcodebuild -exportArchive \
@@ -326,14 +305,7 @@ jobs:
           for kd in "${key_dirs[@]}"; do
             mkdir -p "$kd"
             key_path="$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-            KEY_PATH="$key_path" python3 - <<'PY'
-            import os
-            k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
-            if "\\n" in k and "-----BEGIN" in k:
-                k = k.replace("\\n", "\n")
-            with open(os.environ["KEY_PATH"], "w") as f:
-                f.write(k.strip() + "\n")
-            PY
+            KEY_PATH="$key_path" python3 -c "import os; k = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY', '').replace('\\\\n', '\n').strip(); open(os.environ['KEY_PATH'], 'w').write(k + '\n')"
             chmod 600 "$key_path"
           done
           trap 'for kd in "${key_dirs[@]}"; do rm -f "$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" 2>/dev/null || true; done' EXIT
