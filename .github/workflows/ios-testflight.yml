@@ -21,7 +21,7 @@ name: Monsterdoku Production TestFlight
 #    PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes('Monsterdoku_AppStore.mobileprovision'))
 # ==============================================================================
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       version:
@@ -185,13 +185,13 @@ jobs:
           export_path="$RUNNER_TEMP/export"
           trap 'rm -f "$key_path"' EXIT
           python3 - <<'PY'
-import os
-k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
-if "\\n" in k and "-----BEGIN" in k:
-    k = k.replace("\\n", "\n")
-with open(os.environ["RUNNER_TEMP"] + f"/AuthKey_{os.environ['APP_STORE_CONNECT_KEY_ID']}.p8", "w") as f:
-    f.write(k.strip() + "\n")
-PY
+          import os
+          k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
+          if "\\n" in k and "-----BEGIN" in k:
+              k = k.replace("\\n", "\n")
+          with open(os.environ["RUNNER_TEMP"] + f"/AuthKey_{os.environ['APP_STORE_CONNECT_KEY_ID']}.p8", "w") as f:
+              f.write(k.strip() + "\n")
+          PY
           chmod 600 "$key_path"
 
           if [[ -d "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace" ]]; then
@@ -208,13 +208,8 @@ PY
             profile_path="$RUNNER_TEMP/ci.mobileprovision"
             profile_plist="$RUNNER_TEMP/ci.mobileprovision.plist"
 
-            python3 -c "
-import os, base64
-with open('$cert_path', 'wb') as f:
-    f.write(base64.b64decode(os.environ['IOS_CERTIFICATE_BASE64'].strip()))
-with open('$profile_path', 'wb') as f:
-    f.write(base64.b64decode(os.environ['IOS_PROVISIONING_PROFILE_BASE64'].strip()))
-"
+            python3 -c "import os, base64; open('$cert_path', 'wb').write(base64.b64decode(os.environ['IOS_CERTIFICATE_BASE64'].strip())); open('$profile_path', 'wb').write(base64.b64decode(os.environ['IOS_PROVISIONING_PROFILE_BASE64'].strip()))"
+
 
             security create-keychain -p "$keychain_password" "$keychain_path"
             security set-keychain-settings -lut 21600 "$keychain_path"
@@ -324,13 +319,13 @@ with open('$profile_path', 'wb') as f:
             mkdir -p "$kd"
             key_path="$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
             KEY_PATH="$key_path" python3 - <<'PY'
-import os
-k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
-if "\\n" in k and "-----BEGIN" in k:
-    k = k.replace("\\n", "\n")
-with open(os.environ["KEY_PATH"], "w") as f:
-    f.write(k.strip() + "\n")
-PY
+            import os
+            k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
+            if "\\n" in k and "-----BEGIN" in k:
+                k = k.replace("\\n", "\n")
+            with open(os.environ["KEY_PATH"], "w") as f:
+                f.write(k.strip() + "\n")
+            PY
             chmod 600 "$key_path"
           done
           trap 'for kd in "${key_dirs[@]}"; do rm -f "$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" 2>/dev/null || true; done' EXIT
