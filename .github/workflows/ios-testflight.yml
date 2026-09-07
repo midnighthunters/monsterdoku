@@ -1,5 +1,26 @@
 name: Monsterdoku Production TestFlight
 
+# ==============================================================================
+# TESTFLIGHT REQUIRED SECRETS (Configure in GitHub Settings -> Secrets -> Actions):
+# ==============================================================================
+# 1. APPLE_TEAM_ID:
+#    Your 10-character Apple Developer Team ID (e.g., ABC123DEFG)
+# 2. APP_STORE_CONNECT_KEY_ID:
+#    Your App Store Connect API Key ID (e.g., 2X9R4HXF34)
+# 3. APP_STORE_CONNECT_ISSUER_ID:
+#    Your App Store Connect Issuer UUID (e.g., 57246542-96fe-1a63-e053-0824d011072a)
+# 4. APP_STORE_CONNECT_PRIVATE_KEY:
+#    The entire contents of AuthKey_<KEY_ID>.p8 (including -----BEGIN/END PRIVATE KEY-----)
+# 5. IOS_CERTIFICATE_BASE64:
+#    Base64 string of your exported Apple Distribution .p12 certificate
+#    PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes('dist.p12'))
+# 6. IOS_CERTIFICATE_PASSWORD:
+#    Password used when exporting the .p12 certificate (or leave blank if unencrypted)
+# 7. IOS_PROVISIONING_PROFILE_BASE64:
+#    Base64 string of your App Store Provisioning Profile (.mobileprovision)
+#    PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes('Monsterdoku_AppStore.mobileprovision'))
+# ==============================================================================
+
 on:
   workflow_dispatch:
     inputs:
@@ -76,9 +97,43 @@ jobs:
           xcodebuild -version
           xcodebuild -list -project "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj"
           command -v xcrun >/dev/null
-          for secret_name in APPLE_TEAM_ID APP_STORE_CONNECT_PRIVATE_KEY APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID; do
-            test -n "${!secret_name}" || { echo "Missing required secret: $secret_name" >&2; exit 1; }
+          # Validate all required TestFlight secrets
+          secrets_valid=true
+          for secret_name in APPLE_TEAM_ID APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY IOS_CERTIFICATE_BASE64 IOS_PROVISIONING_PROFILE_BASE64; do
+            val="${!secret_name:-}"
+            if [[ -z "$val" ]]; then
+              echo "::error::Missing required secret: $secret_name" >&2
+              secrets_valid=false
+            elif [[ "$val" == REPLACE_WITH_* ]]; then
+              echo "::error::Secret $secret_name is currently set to placeholder value '$val'. Please update it with your actual credentials." >&2
+              secrets_valid=false
+            fi
           done
+
+          if [[ "$secrets_valid" != "true" ]]; then
+            echo "==================================================================" >&2
+            echo "❌ ACTION REQUIRED: Configure TestFlight Secrets in GitHub Settings" >&2
+            echo "Navigate to: Repository -> Settings -> Secrets and variables -> Actions" >&2
+            echo "" >&2
+            echo "1. IOS_CERTIFICATE_BASE64:" >&2
+            echo "   Base64 string of Apple Distribution .p12 certificate." >&2
+            echo "   PowerShell command: [Convert]::ToBase64String([IO.File]::ReadAllBytes('dist.p12'))" >&2
+            echo "" >&2
+            echo "2. IOS_CERTIFICATE_PASSWORD:" >&2
+            echo "   Password used when exporting dist.p12 (leave empty if none)." >&2
+            echo "" >&2
+            echo "3. IOS_PROVISIONING_PROFILE_BASE64:" >&2
+            echo "   Base64 string of App Store Provisioning Profile (.mobileprovision)." >&2
+            echo "   PowerShell command: [Convert]::ToBase64String([IO.File]::ReadAllBytes('Monsterdoku_AppStore.mobileprovision'))" >&2
+            echo "" >&2
+            echo "4. Or update directly via GitHub CLI:" >&2
+            echo "   gh secret set IOS_CERTIFICATE_BASE64 --body \"<base64_p12>\"" >&2
+            echo "   gh secret set IOS_CERTIFICATE_PASSWORD --body \"<p12_password>\"" >&2
+            echo "   gh secret set IOS_PROVISIONING_PROFILE_BASE64 --body \"<base64_profile>\"" >&2
+            echo "==================================================================" >&2
+            exit 1
+          fi
+
           grep -Fq "PRODUCT_BUNDLE_IDENTIFIER = $IOS_BUNDLE_ID;" "$IOS_PROJECT_PATH/Unity-iPhone.xcodeproj/project.pbxproj"
           printf 'IOS_MARKETING_VERSION=%s\nIOS_BUILD_NUMBER=%s\n' "$version" "$build_number" >> "$GITHUB_ENV"
 
@@ -107,7 +162,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -f "$IOS_PROJECT_PATH/Podfile" ]]; then
-            pod install --project-directory="$IOS_PROJECT_PATH" --repo-update
+            pod install --project-directory="$IOS_PROJECT_PATH"
             test -d "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace"
           fi
 
@@ -128,7 +183,15 @@ jobs:
           archive_path="$RUNNER_TEMP/Monsterdoku.xcarchive"
           export_path="$RUNNER_TEMP/export"
           trap 'rm -f "$key_path"' EXIT
-          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
+          python3 - <<'PY'
+import os
+k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
+if "\\n" in k and "-----BEGIN" in k:
+    k = k.replace("\\n", "\n")
+with open(os.environ["RUNNER_TEMP"] + f"/AuthKey_{os.environ['APP_STORE_CONNECT_KEY_ID']}.p8", "w") as f:
+    f.write(k.strip() + "\n")
+PY
+          chmod 600 "$key_path"
 
           if [[ -d "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace" ]]; then
             container=( -workspace "$IOS_PROJECT_PATH/Unity-iPhone.xcworkspace" )
@@ -139,7 +202,7 @@ jobs:
           if [[ -n "$IOS_CERTIFICATE_BASE64" && -n "$IOS_PROVISIONING_PROFILE_BASE64" ]]; then
             echo "Configuring manual code signing with imported .p12 certificate and provisioning profile..."
             keychain_path="$RUNNER_TEMP/ci-signing.keychain-db"
-            keychain_password="${IOS_CERTIFICATE_PASSWORD:-circleci}"
+            keychain_password="${IOS_CERTIFICATE_PASSWORD:-monsterdoku}"
             cert_path="$RUNNER_TEMP/ios-dist.p12"
             profile_path="$RUNNER_TEMP/ci.mobileprovision"
             profile_plist="$RUNNER_TEMP/ci.mobileprovision.plist"
@@ -152,6 +215,7 @@ jobs:
             security unlock-keychain -p "$keychain_password" "$keychain_path"
             security import "$cert_path" -k "$keychain_path" -P "$keychain_password" -T /usr/bin/codesign -T /usr/bin/security
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
+            security default-keychain -s "$keychain_path"
             security list-keychains -d user -s "$keychain_path" "${HOME}/Library/Keychains/login.keychain-db"
 
             security cms -D -i "$profile_path" > "$profile_plist"
@@ -160,6 +224,7 @@ jobs:
             mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
             cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/${profile_uuid}.mobileprovision"
 
+            echo "Archiving with manual Apple Distribution signing..."
             xcodebuild archive \
               "${container[@]}" \
               -scheme Unity-iPhone \
@@ -168,9 +233,8 @@ jobs:
               -destination generic/platform=iOS \
               -archivePath "$archive_path" \
               CODE_SIGN_STYLE=Manual \
+              CODE_SIGN_IDENTITY="Apple Distribution" \
               DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-              PROVISIONING_PROFILE="$profile_uuid" \
-              PROVISIONING_PROFILE_SPECIFIER="$profile_name" \
               CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
               TARGETED_DEVICE_FAMILY="1,2"
 
@@ -178,9 +242,13 @@ jobs:
             plutil -insert method -string app-store "$RUNNER_TEMP/ExportOptions.plist"
             plutil -insert signingStyle -string manual "$RUNNER_TEMP/ExportOptions.plist"
             plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert manageAppVersionAndBuildNumber -bool false "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert stripSwiftSymbols -bool true "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert uploadSymbols -bool true "$RUNNER_TEMP/ExportOptions.plist"
             plutil -insert provisioningProfiles -dictionary "$RUNNER_TEMP/ExportOptions.plist"
             plutil -insert "provisioningProfiles.$IOS_BUNDLE_ID" -string "$profile_name" "$RUNNER_TEMP/ExportOptions.plist"
 
+            echo "Exporting App Store IPA..."
             xcodebuild -exportArchive \
               -archivePath "$archive_path" \
               -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
@@ -207,6 +275,9 @@ jobs:
             plutil -insert method -string app-store "$RUNNER_TEMP/ExportOptions.plist"
             plutil -insert signingStyle -string automatic "$RUNNER_TEMP/ExportOptions.plist"
             plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert manageAppVersionAndBuildNumber -bool false "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert stripSwiftSymbols -bool true "$RUNNER_TEMP/ExportOptions.plist"
+            plutil -insert uploadSymbols -bool true "$RUNNER_TEMP/ExportOptions.plist"
 
             xcodebuild -exportArchive \
               -archivePath "$archive_path" \
@@ -244,7 +315,14 @@ jobs:
           for kd in "${key_dirs[@]}"; do
             mkdir -p "$kd"
             key_path="$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-            printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
+            KEY_PATH="$key_path" python3 - <<'PY'
+import os
+k = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY", "")
+if "\\n" in k and "-----BEGIN" in k:
+    k = k.replace("\\n", "\n")
+with open(os.environ["KEY_PATH"], "w") as f:
+    f.write(k.strip() + "\n")
+PY
             chmod 600 "$key_path"
           done
           trap 'for kd in "${key_dirs[@]}"; do rm -f "$kd/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" 2>/dev/null || true; done' EXIT

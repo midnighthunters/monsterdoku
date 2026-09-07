@@ -19,23 +19,34 @@ Depending on whether you use **Automatic Signing** (via App Store Connect API Ke
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect Issuer ID |
 | `APP_STORE_CONNECT_PRIVATE_KEY` | Contents of `AuthKey_<KEY_ID>.p8` |
 
-### Option B: Manual Signing (Distribution `.p12` + Profile)
-| Variable / Secret | Description |
-| --- | --- |
-| `APPLE_TEAM_ID` | Your 10-character Apple Developer Team ID |
-| `IOS_BUNDLE_ID` | `com.zemolabs.monsterdoku` |
-| `IOS_CERTIFICATE_BASE64` | Base64-encoded Apple Distribution `.p12` certificate |
-| `IOS_CERTIFICATE_PASSWORD` | Password for the `.p12` file |
-| `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `monsterdoku_prod_profile.mobileprovision` |
-| `APP_STORE_CONNECT_KEY_ID` | App Store Connect API Key ID (required for upload) |
-| `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect Issuer ID (required for upload) |
-| `APP_STORE_CONNECT_PRIVATE_KEY` | Contents of `AuthKey_<KEY_ID>.p8` (required for upload) |
+### Option B: Manual Signing (Required for App Store / TestFlight on GitHub Actions)
+| Variable / Secret | Description | Status |
+| --- | --- | --- |
+| `APPLE_TEAM_ID` | Your 10-character Apple Developer Team ID | Configured |
+| `APP_STORE_CONNECT_KEY_ID` | App Store Connect API Key ID | Configured |
+| `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect Issuer ID | Configured |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | Contents of `AuthKey_<KEY_ID>.p8` | Configured |
+| `IOS_CERTIFICATE_BASE64` | Base64-encoded Apple Distribution `.p12` certificate | **Placeholder added** |
+| `IOS_CERTIFICATE_PASSWORD` | Password for the `.p12` file (can be empty if unencrypted) | **Placeholder added** |
+| `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `monsterdoku_prod_profile.mobileprovision` | **Placeholder added** |
 
-### Creating Base64 Values in Windows PowerShell:
+### Updating the Secrets via PowerShell + GitHub CLI:
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('AppleDistribution.p12'))
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('monsterdoku_prod_profile.mobileprovision'))
+# 1. Update Certificate:
+$certBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('AppleDistribution.p12'))
+gh secret set IOS_CERTIFICATE_BASE64 --body "$certBase64"
+
+# 2. Update Certificate Password:
+gh secret set IOS_CERTIFICATE_PASSWORD --body "YourP12PasswordHere"
+
+# 3. Update Provisioning Profile:
+$profBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('monsterdoku_prod_profile.mobileprovision'))
+gh secret set IOS_PROVISIONING_PROFILE_BASE64 --body "$profBase64"
 ```
+
+Or update them manually via GitHub Web:
+`https://github.com/midnighthunters/monsterdoku/settings/secrets/actions`
+
 
 ---
 

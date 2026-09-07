@@ -1,4 +1,3 @@
-source 'https://github.com/CocoaPods/Specs'
 source 'https://cdn.cocoapods.org/'
 
 platform :ios, '13.0'
