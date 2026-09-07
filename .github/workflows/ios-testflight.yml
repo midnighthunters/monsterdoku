@@ -241,15 +241,23 @@ jobs:
               CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
               TARGETED_DEVICE_FAMILY="1,2"
 
-            plutil -create xml1 "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert method -string app-store "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert signingStyle -string manual "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert manageAppVersionAndBuildNumber -bool false "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert stripSwiftSymbols -bool true "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert uploadSymbols -bool true "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert provisioningProfiles -dictionary "$RUNNER_TEMP/ExportOptions.plist"
-            plutil -insert "provisioningProfiles.$IOS_BUNDLE_ID" -string "$profile_name" "$RUNNER_TEMP/ExportOptions.plist"
+            export profile_name
+            python3 - <<'PY'
+            import os, plistlib
+            options = {
+                "method": "app-store",
+                "signingStyle": "manual",
+                "teamID": os.environ["APPLE_TEAM_ID"],
+                "manageAppVersionAndBuildNumber": False,
+                "stripSwiftSymbols": True,
+                "uploadSymbols": True,
+                "provisioningProfiles": {
+                    os.environ["IOS_BUNDLE_ID"]: os.environ["profile_name"]
+                }
+            }
+            with open(os.environ["RUNNER_TEMP"] + "/ExportOptions.plist", "wb") as f:
+                plistlib.dump(options, f)
+            PY
 
             echo "Exporting App Store IPA..."
             xcodebuild -exportArchive \
